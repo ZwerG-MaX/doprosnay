@@ -195,7 +195,7 @@ export function CameraWall({ onEvent, onToast }: Props) {
       title="ВИДЕОСТЕНА"
       sub={`MACROSCOP · ${VMS_HOST} · 3 потока`}
       ledClass="bg-hud shadow-[0_0_8px_rgba(69,200,255,0.8)]"
-      className="flex-1"
+      className="min-h-0 flex-1"
       delay={40}
       right={
         <>

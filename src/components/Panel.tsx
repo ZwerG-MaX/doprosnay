@@ -26,9 +26,11 @@ export function Panel({
     >
       <header className="flex h-11 shrink-0 items-center gap-2.5 rounded-t-md border-b border-line bg-panel2/80 px-3.5">
         <span className={`led ${ledClass}`} />
-        <h2 className="font-display text-[11.5px] tracking-[0.18em] text-fg">{title}</h2>
+        <h2 className="shrink-0 font-display text-[11.5px] tracking-[0.18em] text-fg">{title}</h2>
         {sub && (
-          <span className="hidden font-mono text-[10px] text-faint md:block">{sub}</span>
+          <span className="hidden min-w-0 flex-1 truncate font-mono text-[10px] text-faint md:block">
+            {sub}
+          </span>
         )}
         {right && <div className="ml-auto flex items-center gap-1.5">{right}</div>}
       </header>

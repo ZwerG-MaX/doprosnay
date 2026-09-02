@@ -51,17 +51,17 @@ export default function App() {
     <div className="flex min-h-screen flex-col text-fg lg:h-screen lg:overflow-hidden">
       <StatusBar sessionStart={sessionStart.current} />
 
-      <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_408px]">
-        {/* левая колонка: видеостена + журнал */}
+      <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-2">
+        {/* левая половина: совместный протокол */}
+        <ProtocolEditor onEvent={addEvent} />
+
+        {/* правая половина: видеостена + аудиоканал и журнал */}
         <section className="flex min-h-0 flex-col gap-3">
           <CameraWall onEvent={addEvent} onToast={pushToast} />
-          <EventLog events={events} />
-        </section>
-
-        {/* правая колонка: аудио + протокол */}
-        <section className="flex min-h-0 flex-col gap-3">
-          <CommPanel onEvent={addEvent} />
-          <ProtocolEditor onEvent={addEvent} />
+          <div className="grid shrink-0 grid-cols-1 gap-3 2xl:grid-cols-2">
+            <CommPanel onEvent={addEvent} />
+            <EventLog events={events} />
+          </div>
         </section>
       </main>
 
