@@ -178,7 +178,7 @@ export function CommPanel({ onEvent }: Props) {
       title="АУДИОКАНАЛ · MUMBLE"
       sub={MUMBLE_URL}
       delay={90}
-      className="shrink-0 lg:max-h-[440px]"
+      className="min-h-0 lg:flex-[3]"
       ledClass={
         status === "online"
           ? "bg-live shadow-[0_0_8px_rgba(53,217,127,0.8)]"
