@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CAMERAS, type EventType } from "../lib/data";
 import { useNow, useInterval, fmtClock, fmtDate, randInt } from "../lib/hooks";
+import type { PttApi } from "../lib/usePtt";
 import { Feed } from "./CameraFeed";
-import { IcSnap, IcClose, IcSignal, IcCam } from "./Icons";
+import { Eq } from "./CommPanel";
+import { IcSnap, IcClose, IcSignal, IcCam, IcRadio } from "./Icons";
 
 const RES: Record<string, string> = {
   cam1: "2560×1440",
@@ -13,13 +15,14 @@ const RES: Record<string, string> = {
 
 interface Props {
   camId: string;
+  ptt: PttApi;
   onSwitch: (id: string) => void;
   onClose: () => void;
   onEvent: (t: EventType, s: string) => void;
   onToast: (s: string) => void;
 }
 
-export function CameraModal({ camId, onSwitch, onClose, onEvent, onToast }: Props) {
+export function CameraModal({ camId, ptt, onSwitch, onClose, onEvent, onToast }: Props) {
   const [glitch, setGlitch] = useState(false);
   const [flash, setFlash] = useState(false);
   const [rates, setRates] = useState<number[]>(() => CAMERAS.map(() => randInt(3700, 4700)));
@@ -164,7 +167,34 @@ export function CameraModal({ camId, onSwitch, onClose, onEvent, onToast }: Prop
             })}
           </div>
 
-          <span className="hidden shrink-0 font-mono text-[9.5px] tracking-wider text-faint md:block">
+          {/* тангента — общая с панелью Mumble */}
+          <button
+            onPointerDown={ptt.startTx}
+            onPointerUp={ptt.stopTx}
+            onPointerLeave={ptt.stopTx}
+            onPointerCancel={ptt.stopTx}
+            onContextMenu={(e) => e.preventDefault()}
+            title="Удерживайте для передачи в «Допросную №2» (или SPACE)"
+            className={`flex h-12 w-[212px] shrink-0 touch-none select-none flex-col items-center justify-center gap-0.5 rounded-md border font-display tracking-[0.2em] transition-all duration-150 ${
+              ptt.tx
+                ? "rt-grad-bg ptt-live border-transparent text-white"
+                : "border-amber/60 bg-amber/10 text-amber hover:border-amber hover:bg-amber/15 active:scale-[0.99]"
+            }`}
+          >
+            <span className="flex items-center gap-2 text-[11px]">
+              {ptt.tx ? <Eq className="text-white" /> : <IcRadio className="h-4 w-4" />}
+              {ptt.tx ? "ПЕРЕДАЧА" : "PUSH-TO-TALK"}
+            </span>
+            <span
+              className={`font-mono text-[8.5px] tracking-[0.12em] ${
+                ptt.tx ? "text-white/80" : "text-amber/70"
+              }`}
+            >
+              {ptt.tx ? `в эфире ${ptt.txSec} с · SPACE` : "удерживайте · SPACE"}
+            </span>
+          </button>
+
+          <span className="hidden shrink-0 font-mono text-[9.5px] tracking-wider text-faint xl:block">
             ← → или 1–{CAMERAS.length} · ESC — закрыть
           </span>
         </div>

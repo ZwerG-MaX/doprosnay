@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CAMERAS, VMS_HOST, type EventType } from "../lib/data";
 import { useNow, useInterval, randInt } from "../lib/hooks";
+import type { PttApi } from "../lib/usePtt";
 import { Panel } from "./Panel";
 import { Feed } from "./CameraFeed";
 import { CameraModal } from "./CameraModal";
@@ -9,10 +10,11 @@ import { IcPopout } from "./Icons";
 interface Props {
   onEvent: (t: EventType, s: string) => void;
   onToast: (s: string) => void;
+  ptt: PttApi;
 }
 
 /* Видеостена: только 3 камеры. Снимки, полный экран, метаданные — во всплывающем окне. */
-export function CameraWall({ onEvent, onToast }: Props) {
+export function CameraWall({ onEvent, onToast, ptt }: Props) {
   const [activeId, setActiveId] = useState(CAMERAS[0].id);
   const [glitch, setGlitch] = useState(false);
   const [modalId, setModalId] = useState<string | null>(null);
@@ -131,6 +133,7 @@ export function CameraWall({ onEvent, onToast }: Props) {
       {modalId && (
         <CameraModal
           camId={modalId}
+          ptt={ptt}
           onSwitch={(id) => {
             setModalId(id);
             switchCam(id);

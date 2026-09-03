@@ -5,8 +5,9 @@ import { CommPanel } from "./components/CommPanel";
 import { ProtocolEditor } from "./components/ProtocolEditor";
 import { EventLog } from "./components/EventLog";
 import { Ticker } from "./components/Ticker";
-import { OBSERVERS, type EventItem, type EventType, type Observer } from "./lib/data";
+import { OBSERVERS, MUMBLE_URL, type EventItem, type EventType, type Observer } from "./lib/data";
 import { fmtClock, useInterval } from "./lib/hooks";
+import { usePtt } from "./lib/usePtt";
 
 let nextId = 1;
 
@@ -15,6 +16,8 @@ export default function App() {
   const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
   /* наблюдатели подключаются по мере поступления — список динамический */
   const [connected, setConnected] = useState<Observer[]>(() => [OBSERVERS[0]]);
+  /* аудиоканал Mumble + единая тангента (панель и видеоокно) */
+  const [mumbleOnline, setMumbleOnline] = useState(false);
   const sessionStart = useRef(Date.now());
   const connectedRef = useRef(connected);
   connectedRef.current = connected;
@@ -31,6 +34,18 @@ export default function App() {
     setToasts((prev) => [...prev, { id, text }]);
     window.setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3400);
   }, []);
+
+  /* единая тангента: панель Mumble и полноэкранное видеоокно */
+  const ptt = usePtt(mumbleOnline, addEvent);
+
+  /* подключение к серверу Mumble */
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setMumbleOnline(true);
+      addEvent("audio", `Mumble: подключено к ${MUMBLE_URL} · Opus 128 кбит/с`);
+    }, 1200);
+    return () => window.clearTimeout(t);
+  }, [addEvent]);
 
   /* подключение / отключение наблюдателей */
   const join = useCallback(
@@ -94,9 +109,11 @@ export default function App() {
 
         {/* правая половина: видеостена + аудиоканал */}
         <section className="flex min-h-0 flex-col gap-3">
-          <CameraWall onEvent={addEvent} onToast={pushToast} />
+          <CameraWall onEvent={addEvent} onToast={pushToast} ptt={ptt} />
           <CommPanel
             connected={connected}
+            online={mumbleOnline}
+            ptt={ptt}
             onJoin={joinNext}
             onLeave={leave}
             onEvent={addEvent}

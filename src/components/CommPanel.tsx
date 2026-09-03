@@ -1,32 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { OBSERVERS, MUMBLE_URL, type EventType, type Observer } from "../lib/data";
 import { useInterval, randInt } from "../lib/hooks";
+import type { PttApi } from "../lib/usePtt";
 import { Panel } from "./Panel";
 import { IcMic, IcMicOff, IcHeadOff, IcRadio, IcChevR, IcPlus, IcClose } from "./Icons";
 
-function beep(freq: number) {
-  try {
-    const AC =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const ctx = new AC();
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = "sine";
-    o.frequency.value = freq;
-    g.gain.setValueAtTime(0.045, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.09);
-    o.connect(g);
-    g.connect(ctx.destination);
-    o.start();
-    o.stop(ctx.currentTime + 0.1);
-    window.setTimeout(() => ctx.close().catch(() => undefined), 250);
-  } catch {
-    /* аудио недоступно — тихо игнорируем */
-  }
-}
-
-function Eq({ className = "text-amber" }: { className?: string }) {
+export function Eq({ className = "text-amber" }: { className?: string }) {
   return (
     <span className={`eq ${className}`}>
       <i />
@@ -39,98 +18,31 @@ function Eq({ className = "text-amber" }: { className?: string }) {
 
 interface Props {
   connected: Observer[];
+  online: boolean;
+  ptt: PttApi;
   onJoin: () => void;
   onLeave: (o: Observer) => void;
   onEvent: (t: EventType, s: string) => void;
 }
 
-export function CommPanel({ connected, onJoin, onLeave, onEvent }: Props) {
-  const [status, setStatus] = useState<"connecting" | "online">("connecting");
+export function CommPanel({ connected, online, ptt, onJoin, onLeave, onEvent }: Props) {
   const [latency, setLatency] = useState(24);
-  const [muted, setMuted] = useState(false);
-  const [deafened, setDeafened] = useState(false);
-  const [tx, setTx] = useState(false);
-  const [txSec, setTxSec] = useState(0);
   const [bars, setBars] = useState<number[]>(() => Array.from({ length: 14 }, () => 6));
   const [speakingId, setSpeakingId] = useState<number | null>(null);
-
-  const txRef = useRef(false);
-  const txSecRef = useRef(0);
   const speakTimer = useRef<number>(0);
 
-  /* подключение к серверу Mumble */
-  useEffect(() => {
-    const t = window.setTimeout(() => {
-      setStatus("online");
-      onEvent("audio", `Mumble: подключено к ${MUMBLE_URL} · Opus 128 кбит/с`);
-    }, 1200);
-    return () => window.clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   useInterval(() => {
-    if (status === "online") setLatency(randInt(17, 42));
+    if (online) setLatency(randInt(17, 42));
   }, 2400);
 
-  /* тангента */
-  const startTx = () => {
-    if (txRef.current || status !== "online") return;
-    if (muted || deafened) {
-      onEvent("audio", "Передача отклонена: микрофон выключен");
-      return;
-    }
-    txRef.current = true;
-    txSecRef.current = 0;
-    setTx(true);
-    setTxSec(0);
-    beep(988);
-    onEvent("audio", "Тангента: начата передача в «Допросную №2»");
-  };
-
-  const stopTx = () => {
-    if (!txRef.current) return;
-    txRef.current = false;
-    setTx(false);
-    beep(622);
-    onEvent("audio", `Тангента: передача завершена (${txSecRef.current} с)`);
-  };
-
-  useEffect(() => {
-    const dn = (e: KeyboardEvent) => {
-      if (e.code !== "Space" || e.repeat) return;
-      const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT" || el.isContentEditable))
-        return;
-      e.preventDefault();
-      startTx();
-    };
-    const up = (e: KeyboardEvent) => {
-      if (e.code === "Space") stopTx();
-    };
-    window.addEventListener("keydown", dn);
-    window.addEventListener("keyup", up);
-    return () => {
-      window.removeEventListener("keydown", dn);
-      window.removeEventListener("keyup", up);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, muted, deafened]);
-
-  /* таймер и индикатор уровня */
+  /* индикатор уровня */
   useInterval(() => {
-    if (txRef.current) {
-      txSecRef.current += 1;
-      setTxSec(txSecRef.current);
-    }
-  }, 1000);
-
-  useInterval(() => {
-    setBars((prev) => prev.map(() => (txRef.current ? randInt(14, 100) : randInt(4, 9))));
+    setBars((prev) => prev.map(() => (ptt.tx ? randInt(14, 100) : randInt(4, 9))));
   }, 120);
 
-  /* симуляция голосовой активности среди подключённых */
+  /* симуляция голосовой активности в канале */
   useInterval(() => {
-    if (status !== "online" || Math.random() < 0.45) return;
+    if (!online || Math.random() < 0.45) return;
     const pool = [101, 102, ...connected.filter((o) => !o.muted && o.n !== 1).map((o) => o.n)];
     setSpeakingId(pool[randInt(0, pool.length - 1)]);
     window.clearTimeout(speakTimer.current);
@@ -191,13 +103,13 @@ export function CommPanel({ connected, onJoin, onLeave, onEvent }: Props) {
       delay={90}
       className="min-h-0 lg:max-h-[420px]"
       ledClass={
-        status === "online"
+        online
           ? "bg-live shadow-[0_0_8px_rgba(49,217,138,0.8)]"
           : "bg-amber shadow-[0_0_8px_rgba(255,138,61,0.8)] blink-rec"
       }
       right={
         <span className="rounded-full border border-line bg-raise px-2 py-0.5 font-mono text-[10px] text-dim tabular-nums">
-          {status === "online" ? `${latency} мс` : "подключение…"}
+          {online ? `${latency} мс` : "подключение…"}
         </span>
       }
     >
@@ -250,26 +162,30 @@ export function CommPanel({ connected, onJoin, onLeave, onEvent }: Props) {
           </div>
         </div>
 
-        {/* тангента */}
+        {/* тангента (общая с полноэкранным видеоокном) */}
         <div className="mt-auto pt-1">
           <button
-            onPointerDown={startTx}
-            onPointerUp={stopTx}
-            onPointerLeave={stopTx}
-            onPointerCancel={stopTx}
+            onPointerDown={ptt.startTx}
+            onPointerUp={ptt.stopTx}
+            onPointerLeave={ptt.stopTx}
+            onPointerCancel={ptt.stopTx}
             onContextMenu={(e) => e.preventDefault()}
             className={`flex h-[72px] w-full touch-none select-none flex-col items-center justify-center gap-0.5 rounded-lg border font-display tracking-[0.22em] transition-all duration-150 ${
-              tx
+              ptt.tx
                 ? "rt-grad-bg ptt-live border-transparent text-white"
                 : "border-amber/60 bg-panel2 text-amber hover:border-amber hover:bg-amber/10 active:scale-[0.99]"
             }`}
           >
             <span className="flex items-center gap-2.5 text-[13px]">
-              {tx ? <Eq className="text-white" /> : <IcRadio className="h-4.5 w-4.5" />}
-              {tx ? "ПЕРЕДАЧА" : "PUSH-TO-TALK"}
+              {ptt.tx ? <Eq className="text-white" /> : <IcRadio className="h-4.5 w-4.5" />}
+              {ptt.tx ? "ПЕРЕДАЧА" : "PUSH-TO-TALK"}
             </span>
-            <span className={`font-mono text-[9.5px] tracking-[0.14em] ${tx ? "text-white/80" : "text-dim"}`}>
-              {tx ? `в эфире ${txSec} с → «Допросная №2»` : "удерживайте кнопку или SPACE"}
+            <span
+              className={`font-mono text-[9.5px] tracking-[0.14em] ${
+                ptt.tx ? "text-white/80" : "text-dim"
+              }`}
+            >
+              {ptt.tx ? `в эфире ${ptt.txSec} с → «Допросная №2»` : "удерживайте кнопку или SPACE"}
             </span>
           </button>
 
@@ -279,13 +195,13 @@ export function CommPanel({ connected, onJoin, onLeave, onEvent }: Props) {
               <span
                 key={i}
                 className={`flex-1 rounded-[1px] transition-all duration-100 ${
-                  tx ? (h > 72 ? "bg-rec" : h > 40 ? "bg-amber" : "bg-live") : "bg-line2/70"
+                  ptt.tx ? (h > 72 ? "bg-rec" : h > 40 ? "bg-amber" : "bg-live") : "bg-line2/70"
                 }`}
                 style={{ height: `${h}%` }}
               />
             ))}
             <span className="ml-1.5 w-[74px] shrink-0 text-right font-mono text-[9px] leading-none text-faint">
-              {tx ? "TX · -6 дБ" : "RX · тишина"}
+              {ptt.tx ? "TX · -6 дБ" : "RX · тишина"}
             </span>
           </div>
 
@@ -293,31 +209,34 @@ export function CommPanel({ connected, onJoin, onLeave, onEvent }: Props) {
           <div className="mt-2 flex items-center gap-1.5">
             <button
               onClick={() => {
-                setMuted((m) => !m);
-                onEvent("audio", muted ? "Микрофон включён" : "Микрофон выключен (mute)");
+                ptt.toggleMute();
+                onEvent("audio", ptt.muted ? "Микрофон включён" : "Микрофон выключен (mute)");
               }}
               className={`flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md border font-mono text-[10px] tracking-widest transition-all active:scale-[0.98] ${
-                muted
+                ptt.muted
                   ? "border-rec/60 bg-rec/10 text-rec"
                   : "border-line bg-panel2 text-dim hover:border-line2 hover:text-fg"
               }`}
             >
-              {muted ? <IcMicOff className="h-3.5 w-3.5" /> : <IcMic className="h-3.5 w-3.5" />}
-              {muted ? "ВКЛ МИК" : "МИК ВКЛ"}
+              {ptt.muted ? <IcMicOff className="h-3.5 w-3.5" /> : <IcMic className="h-3.5 w-3.5" />}
+              {ptt.muted ? "ВКЛ МИК" : "МИК ВКЛ"}
             </button>
             <button
               onClick={() => {
-                setDeafened((d) => !d);
-                onEvent("audio", deafened ? "Прослушивание включено" : "Прослушивание отключено (deafen)");
+                ptt.toggleDeafen();
+                onEvent(
+                  "audio",
+                  ptt.deafened ? "Прослушивание включено" : "Прослушивание отключено (deafen)",
+                );
               }}
               className={`flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md border font-mono text-[10px] tracking-widest transition-all active:scale-[0.98] ${
-                deafened
+                ptt.deafened
                   ? "border-rec/60 bg-rec/10 text-rec"
                   : "border-line bg-panel2 text-dim hover:border-line2 hover:text-fg"
               }`}
             >
               <IcHeadOff className="h-3.5 w-3.5" />
-              {deafened ? "ВКЛ ЗВУК" : "ГЛУШИТЬ"}
+              {ptt.deafened ? "ВКЛ ЗВУК" : "ГЛУШИТЬ"}
             </button>
             <span className="hidden shrink-0 font-mono text-[9px] leading-tight text-faint xl:block">
               Opus 128 кбит/с
