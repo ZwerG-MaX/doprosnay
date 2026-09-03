@@ -74,7 +74,7 @@ export function CameraModal({ camId, onSwitch, onClose, onEvent, onToast }: Prop
   return createPortal(
     <div className="fixed inset-0 z-[100] flex flex-col bg-ink">
       {/* ── верхняя панель ── */}
-      <header className="flex h-12 shrink-0 items-center gap-3 border-b border-line2 bg-panel/95 px-3.5">
+      <header className="relative flex h-12 shrink-0 items-center gap-3 border-b border-line2 bg-panel/95 px-3.5">
         <span className="led blink-rec bg-rec shadow-[0_0_8px_rgba(255,59,78,0.9)]" />
         <div className="leading-none">
           <div className="font-display text-[13px] tracking-[0.16em] text-fg">
@@ -106,7 +106,7 @@ export function CameraModal({ camId, onSwitch, onClose, onEvent, onToast }: Prop
           <button
             onClick={snapshot}
             title="Снимок кадра"
-            className={`${iconBtn} border-hud/50 bg-hud/10 text-hud hover:bg-hud/20`}
+            className={`${iconBtn} rt-grad-bg text-white shadow-[0_4px_18px_rgba(122,92,245,0.45)] hover:brightness-110`}
           >
             <IcSnap className="h-4 w-4" />
           </button>
@@ -118,6 +118,7 @@ export function CameraModal({ camId, onSwitch, onClose, onEvent, onToast }: Prop
             <IcClose className="h-4 w-4" />
           </button>
         </div>
+        <div className="rt-stripe absolute inset-x-0 bottom-0" />
       </header>
 
       {/* ── видео на весь экран ── */}

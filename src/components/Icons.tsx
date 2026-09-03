@@ -10,11 +10,23 @@ const S = {
   strokeLinejoin: "round" as const,
 };
 
-export const IcLogo = ({ className }: IconProps) => (
-  <svg viewBox="0 0 24 24" className={className} {...S}>
-    <path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" />
-    <circle cx="12" cy="10.5" r="3" />
-    <path d="M12 13.5V17" />
+export const IcRt = ({ className }: IconProps) => (
+  <svg viewBox="0 0 32 32" className={className} fill="none">
+    <defs>
+      <linearGradient id="rtg" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+        <stop offset="0" stopColor="#00b0f0" />
+        <stop offset="0.38" stopColor="#7a5cf5" />
+        <stop offset="0.68" stopColor="#f04e9a" />
+        <stop offset="1" stopColor="#ff8a3d" />
+      </linearGradient>
+    </defs>
+    <path
+      d="M16 3.5a12.5 12.5 0 1 1-12.5 12.5"
+      stroke="url(#rtg)"
+      strokeWidth="5.4"
+      strokeLinecap="round"
+    />
+    <circle cx="16" cy="16" r="3.4" fill="url(#rtg)" />
   </svg>
 );
 

@@ -231,10 +231,10 @@ export function CommPanel({ onEvent }: Props) {
             onPointerLeave={stopTx}
             onPointerCancel={stopTx}
             onContextMenu={(e) => e.preventDefault()}
-            className={`flex h-[72px] w-full touch-none select-none flex-col items-center justify-center gap-0.5 rounded-sm border font-display tracking-[0.22em] transition-all duration-150 ${
+            className={`flex h-[72px] w-full touch-none select-none flex-col items-center justify-center gap-0.5 rounded-xl border font-display tracking-[0.22em] transition-all duration-150 ${
               tx
-                ? "ptt-live border-amber bg-amber/15 text-amber"
-                : "border-line2 bg-panel2 text-amber/90 hover:border-amber/60 hover:bg-amber/5 active:scale-[0.99]"
+                ? "ptt-live rt-grad-bg border-transparent text-white"
+                : "border-amber/60 bg-panel2 text-amber hover:border-amber hover:bg-amber/10 active:scale-[0.99]"
             }`}
           >
             <span className="flex items-center gap-2.5 text-[13px]">
