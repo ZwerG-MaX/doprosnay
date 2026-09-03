@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { OBSERVERS, MUMBLE_URL, type EventType } from "../lib/data";
+import { OBSERVERS, MUMBLE_URL, type EventType, type Observer } from "../lib/data";
 import { useInterval, randInt } from "../lib/hooks";
 import { Panel } from "./Panel";
-import { IcMic, IcMicOff, IcHeadOff, IcRadio, IcChevR } from "./Icons";
+import { IcMic, IcMicOff, IcHeadOff, IcRadio, IcChevR, IcPlus, IcClose } from "./Icons";
 
 function beep(freq: number) {
   try {
@@ -38,10 +38,13 @@ function Eq({ className = "text-amber" }: { className?: string }) {
 }
 
 interface Props {
+  connected: Observer[];
+  onJoin: () => void;
+  onLeave: (o: Observer) => void;
   onEvent: (t: EventType, s: string) => void;
 }
 
-export function CommPanel({ onEvent }: Props) {
+export function CommPanel({ connected, onJoin, onLeave, onEvent }: Props) {
   const [status, setStatus] = useState<"connecting" | "online">("connecting");
   const [latency, setLatency] = useState(24);
   const [muted, setMuted] = useState(false);
@@ -122,15 +125,13 @@ export function CommPanel({ onEvent }: Props) {
   }, 1000);
 
   useInterval(() => {
-    setBars((prev) =>
-      prev.map(() => (txRef.current ? randInt(14, 100) : randInt(4, 9)))
-    );
+    setBars((prev) => prev.map(() => (txRef.current ? randInt(14, 100) : randInt(4, 9))));
   }, 120);
 
-  /* симуляция голосовой активности в канале */
+  /* симуляция голосовой активности среди подключённых */
   useInterval(() => {
     if (status !== "online" || Math.random() < 0.45) return;
-    const pool = [101, 102, ...OBSERVERS.filter((o) => !o.muted && o.n !== 1).map((o) => o.n)];
+    const pool = [101, 102, ...connected.filter((o) => !o.muted && o.n !== 1).map((o) => o.n)];
     setSpeakingId(pool[randInt(0, pool.length - 1)]);
     window.clearTimeout(speakTimer.current);
     speakTimer.current = window.setTimeout(() => setSpeakingId(null), 1700);
@@ -146,12 +147,13 @@ export function CommPanel({ onEvent }: Props) {
     name: string,
     speakKey: number,
     isMuted = false,
+    onX?: () => void,
   ) => {
     const isSpeaking = speakingId === speakKey;
     return (
       <div
         key={keyVal}
-        className={`flex h-[22px] items-center gap-1.5 rounded-sm px-1.5 transition-colors ${
+        className={`group/row flex h-[22px] items-center gap-1.5 rounded-sm px-1.5 transition-colors ${
           isSpeaking ? "bg-raise text-fg" : "text-dim hover:bg-panel2/70"
         }`}
       >
@@ -160,13 +162,22 @@ export function CommPanel({ onEvent }: Props) {
         <span className={`truncate text-[11px] ${isSpeaking ? "text-fg" : "text-dim"}`}>
           {name}
         </span>
-        <span className="ml-auto flex items-center">
+        <span className="ml-auto flex items-center gap-1">
           {isMuted ? (
             <IcMicOff className="h-3 w-3 text-rec/80" />
           ) : isSpeaking ? (
             <Eq className="text-live" />
           ) : (
             <IcMic className="h-3 w-3 text-faint" />
+          )}
+          {onX && (
+            <button
+              onClick={onX}
+              title="Отключить от канала"
+              className="hidden h-4 w-4 place-items-center rounded-sm text-faint transition-colors hover:bg-rec/15 hover:text-rec group-hover/row:grid"
+            >
+              <IcClose className="h-2.5 w-2.5" />
+            </button>
           )}
         </span>
       </div>
@@ -178,14 +189,14 @@ export function CommPanel({ onEvent }: Props) {
       title="АУДИОКАНАЛ · MUMBLE"
       sub={MUMBLE_URL}
       delay={90}
-      className="shrink-0 lg:max-h-[420px]"
+      className="min-h-0 lg:max-h-[420px]"
       ledClass={
         status === "online"
-          ? "bg-live shadow-[0_0_8px_rgba(53,217,127,0.8)]"
-          : "bg-amber shadow-[0_0_8px_rgba(255,180,58,0.8)] blink-rec"
+          ? "bg-live shadow-[0_0_8px_rgba(49,217,138,0.8)]"
+          : "bg-amber shadow-[0_0_8px_rgba(255,138,61,0.8)] blink-rec"
       }
       right={
-        <span className="rounded-sm border border-line bg-raise px-2 py-0.5 font-mono text-[10px] text-dim tabular-nums">
+        <span className="rounded-full border border-line bg-raise px-2 py-0.5 font-mono text-[10px] text-dim tabular-nums">
           {status === "online" ? `${latency} мс` : "подключение…"}
         </span>
       }
@@ -198,19 +209,34 @@ export function CommPanel({ onEvent }: Props) {
             ДОПРОСНАЯ №2 · ГРОМКАЯ СВЯЗЬ
           </div>
           <div className="mt-1 border-l-2 border-amber/50 pl-1">
-            {userRow("s", "#ffb43a", "SLD", "следователь · майор Ребров", 101)}
-            {userRow("o", "#ffb43a", "OPR", "оперативник · ст. л-т Ткачук", 102)}
+            {userRow("s", "#ff8a3d", "SLD", "следователь · майор Ребров", 101)}
+            {userRow("o", "#ff8a3d", "OPR", "оперативник · ст. л-т Ткачук", 102)}
           </div>
         </div>
 
-        {/* наблюдатели */}
+        {/* наблюдатели — подключаются динамически */}
         <div>
-          <div className={channelHead}>
-            <IcChevR className="h-3 w-3" />
-            НАБЛЮДАТЕЛИ · 8 В КАНАЛЕ
+          <div className="flex items-center justify-between">
+            <div className={channelHead}>
+              <IcChevR className="h-3 w-3" />
+              НАБЛЮДАТЕЛИ · {connected.length} В КАНАЛЕ
+            </div>
+            <button
+              onClick={onJoin}
+              disabled={connected.length >= OBSERVERS.length}
+              title="Подключить наблюдателя"
+              className="grid h-[18px] w-[18px] place-items-center rounded-sm border border-line bg-panel2 text-dim transition-all hover:border-hud/60 hover:text-hud active:scale-90 disabled:cursor-not-allowed disabled:opacity-35"
+            >
+              <IcPlus className="h-3 w-3" />
+            </button>
           </div>
           <div className="mt-1 grid grid-cols-1 border-l-2 border-hud/40 pl-1 sm:grid-cols-2 sm:gap-x-2">
-            {OBSERVERS.map((o) =>
+            {connected.length === 0 && (
+              <div className="col-span-full px-1.5 py-1 font-mono text-[10px] text-faint">
+                канал пуст — нажмите «+», чтобы подключить наблюдателей
+              </div>
+            )}
+            {connected.map((o) =>
               userRow(
                 String(o.n),
                 o.color,
@@ -218,6 +244,7 @@ export function CommPanel({ onEvent }: Props) {
                 o.n === 1 ? `${o.name} (вы)` : o.name,
                 o.n,
                 o.muted,
+                () => onLeave(o),
               ),
             )}
           </div>
@@ -231,25 +258,23 @@ export function CommPanel({ onEvent }: Props) {
             onPointerLeave={stopTx}
             onPointerCancel={stopTx}
             onContextMenu={(e) => e.preventDefault()}
-            className={`flex h-[72px] w-full touch-none select-none flex-col items-center justify-center gap-0.5 rounded-xl border font-display tracking-[0.22em] transition-all duration-150 ${
+            className={`flex h-[72px] w-full touch-none select-none flex-col items-center justify-center gap-0.5 rounded-lg border font-display tracking-[0.22em] transition-all duration-150 ${
               tx
-                ? "ptt-live rt-grad-bg border-transparent text-white"
+                ? "rt-grad-bg ptt-live border-transparent text-white"
                 : "border-amber/60 bg-panel2 text-amber hover:border-amber hover:bg-amber/10 active:scale-[0.99]"
             }`}
           >
             <span className="flex items-center gap-2.5 text-[13px]">
-              {tx ? <Eq className="text-amber" /> : <IcRadio className="h-4.5 w-4.5" />}
+              {tx ? <Eq className="text-white" /> : <IcRadio className="h-4.5 w-4.5" />}
               {tx ? "ПЕРЕДАЧА" : "PUSH-TO-TALK"}
             </span>
-            <span className="font-mono text-[9.5px] tracking-[0.14em] text-dim">
-              {tx
-                ? `в эфире ${txSec} с → «Допросная №2»`
-                : "удерживайте кнопку или SPACE"}
+            <span className={`font-mono text-[9.5px] tracking-[0.14em] ${tx ? "text-white/80" : "text-dim"}`}>
+              {tx ? `в эфире ${txSec} с → «Допросная №2»` : "удерживайте кнопку или SPACE"}
             </span>
           </button>
 
           {/* индикатор уровня */}
-          <div className="mt-2 flex h-7 items-end gap-[3px] rounded-sm border border-line bg-panel2 px-2 py-1">
+          <div className="mt-2 flex h-7 items-end gap-[3px] rounded-md border border-line bg-panel2 px-2 py-1">
             {bars.map((h, i) => (
               <span
                 key={i}
@@ -271,7 +296,7 @@ export function CommPanel({ onEvent }: Props) {
                 setMuted((m) => !m);
                 onEvent("audio", muted ? "Микрофон включён" : "Микрофон выключен (mute)");
               }}
-              className={`flex h-8 flex-1 items-center justify-center gap-1.5 rounded-sm border font-mono text-[10px] tracking-widest transition-all active:scale-[0.98] ${
+              className={`flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md border font-mono text-[10px] tracking-widest transition-all active:scale-[0.98] ${
                 muted
                   ? "border-rec/60 bg-rec/10 text-rec"
                   : "border-line bg-panel2 text-dim hover:border-line2 hover:text-fg"
@@ -285,7 +310,7 @@ export function CommPanel({ onEvent }: Props) {
                 setDeafened((d) => !d);
                 onEvent("audio", deafened ? "Прослушивание включено" : "Прослушивание отключено (deafen)");
               }}
-              className={`flex h-8 flex-1 items-center justify-center gap-1.5 rounded-sm border font-mono text-[10px] tracking-widest transition-all active:scale-[0.98] ${
+              className={`flex h-8 flex-1 items-center justify-center gap-1.5 rounded-md border font-mono text-[10px] tracking-widest transition-all active:scale-[0.98] ${
                 deafened
                   ? "border-rec/60 bg-rec/10 text-rec"
                   : "border-line bg-panel2 text-dim hover:border-line2 hover:text-fg"

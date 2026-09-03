@@ -5,15 +5,20 @@ import { CommPanel } from "./components/CommPanel";
 import { ProtocolEditor } from "./components/ProtocolEditor";
 import { EventLog } from "./components/EventLog";
 import { Ticker } from "./components/Ticker";
-import { OBSERVERS, type EventItem, type EventType } from "./lib/data";
-import { fmtClock } from "./lib/hooks";
+import { OBSERVERS, type EventItem, type EventType, type Observer } from "./lib/data";
+import { fmtClock, useInterval } from "./lib/hooks";
 
 let nextId = 1;
 
 export default function App() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
+  /* наблюдатели подключаются по мере поступления — список динамический */
+  const [connected, setConnected] = useState<Observer[]>(() => [OBSERVERS[0]]);
   const sessionStart = useRef(Date.now());
+  const connectedRef = useRef(connected);
+  connectedRef.current = connected;
+  const scheduled = useRef<Set<number>>(new Set([OBSERVERS[0].n]));
 
   const addEvent = useCallback((type: EventType, text: string) => {
     setEvents((prev) =>
@@ -27,6 +32,28 @@ export default function App() {
     window.setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3400);
   }, []);
 
+  /* подключение / отключение наблюдателей */
+  const join = useCallback(
+    (o: Observer) => {
+      setConnected((prev) => (prev.some((p) => p.n === o.n) ? prev : [...prev, o]));
+      addEvent("audio", `${o.tag} (${o.name}) подключился к каналу «Наблюдатели»`);
+    },
+    [addEvent],
+  );
+
+  const leave = useCallback(
+    (o: Observer) => {
+      setConnected((prev) => prev.filter((p) => p.n !== o.n));
+      addEvent("audio", `${o.tag} (${o.name}) покинул канал`);
+    },
+    [addEvent],
+  );
+
+  const joinNext = useCallback(() => {
+    const next = OBSERVERS.find((o) => !connectedRef.current.some((p) => p.n === o.n));
+    if (next) join(next);
+  }, [join]);
+
   /* стартовая последовательность подключения систем */
   const booted = useRef(false);
   useEffect(() => {
@@ -37,31 +64,43 @@ export default function App() {
       [800, "video", "MACROSCOP: соединение с VMS-2 установлено (ГОСТ TLS)"],
       [1300, "video", "Потоки CAM 01 / CAM 02 / CAM 03 активны · 25 к/с · H.265"],
       [1800, "sys", "Сервер аудиоканала: рукопожатие Mumble (UDP 64738)"],
+      [2300, "audio", "Н-1 (майор Соколов, вы) подключился к каналу"],
     ];
     seq.forEach(([d, t, s]) => window.setTimeout(() => addEvent(t, s), d));
-    OBSERVERS.forEach((o, i) =>
-      window.setTimeout(
-        () => addEvent("audio", `${o.tag} (${o.name}) подключился к каналу «Наблюдатели»`),
-        2300 + i * 430,
-      ),
-    );
   }, [addEvent]);
+
+  /* остальные наблюдатели подключаются постепенно */
+  const allIn = connected.length >= OBSERVERS.length;
+  useInterval(
+    () => {
+      const next = OBSERVERS.find((o) => !scheduled.current.has(o.n));
+      if (!next) return;
+      scheduled.current.add(next.n);
+      if (!connectedRef.current.some((p) => p.n === next.n)) join(next);
+    },
+    allIn ? null : 3400,
+  );
 
   return (
     <div className="flex min-h-screen flex-col text-fg lg:h-screen lg:overflow-hidden">
       <StatusBar sessionStart={sessionStart.current} />
 
       <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-2">
-        {/* левая половина: совместный протокол + журнал событий */}
+        {/* левая половина: протокол + журнал */}
         <section className="flex min-h-0 flex-col gap-3">
-          <ProtocolEditor onEvent={addEvent} />
+          <ProtocolEditor observers={connected} onEvent={addEvent} onToast={pushToast} />
           <EventLog events={events} />
         </section>
 
         {/* правая половина: видеостена + аудиоканал */}
         <section className="flex min-h-0 flex-col gap-3">
           <CameraWall onEvent={addEvent} onToast={pushToast} />
-          <CommPanel onEvent={addEvent} />
+          <CommPanel
+            connected={connected}
+            onJoin={joinNext}
+            onLeave={leave}
+            onEvent={addEvent}
+          />
         </section>
       </main>
 
@@ -72,9 +111,9 @@ export default function App() {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className="rise flex items-center gap-2.5 rounded-sm border border-line2 bg-panel2/95 px-3.5 py-2.5 shadow-2xl backdrop-blur"
+            className="rise flex items-center gap-2.5 rounded-md border border-line2 bg-panel2/95 px-3.5 py-2.5 shadow-2xl backdrop-blur"
           >
-            <span className="led bg-live shadow-[0_0_7px_rgba(53,217,127,0.9)]" />
+            <span className="led bg-live shadow-[0_0_7px_rgba(49,217,138,0.9)]" />
             <span className="font-mono text-[11.5px] text-fg">{t.text}</span>
           </div>
         ))}
