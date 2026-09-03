@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { CAMERAS, type EventType } from "../lib/data";
 import { useNow, useInterval, fmtClock, fmtDate, randInt } from "../lib/hooks";
 import { Feed } from "./CameraFeed";
@@ -69,8 +70,9 @@ export function CameraModal({ camId, onSwitch, onClose, onEvent, onToast }: Prop
   const iconBtn =
     "grid h-8 w-8 place-items-center rounded-sm border transition-all active:scale-95";
 
-  return (
-    <div className="fixed inset-0 z-[80] flex flex-col bg-black">
+  /* портал в body: окно гарантированно перекрывает все модули пульта */
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex flex-col bg-ink">
       {/* ── верхняя панель ── */}
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-line2 bg-panel/95 px-3.5">
         <span className="led blink-rec bg-rec shadow-[0_0_8px_rgba(255,59,78,0.9)]" />
@@ -166,6 +168,7 @@ export function CameraModal({ camId, onSwitch, onClose, onEvent, onToast }: Prop
           </span>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
