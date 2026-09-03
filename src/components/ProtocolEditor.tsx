@@ -127,7 +127,7 @@ export function ProtocolEditor({ onEvent }: Props) {
     <Panel
       title="ПРОТОКОЛ НАБЛЮДЕНИЯ"
       sub="совместный редактор · 8 участников"
-      className="min-h-[420px] flex-1 lg:min-h-0"
+      className="min-h-[420px] flex-1 lg:min-h-0 lg:flex-[3]"
       delay={120}
       right={
         <span className="flex items-center gap-1.5 rounded-sm border border-line bg-raise px-2 py-0.5 font-mono text-[10px] text-dim">

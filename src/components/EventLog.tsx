@@ -13,7 +13,7 @@ export function EventLog({ events }: { events: EventItem[] }) {
     <Panel
       title="ЖУРНАЛ СОБЫТИЙ"
       sub="хронометраж сеанса · автозапись"
-      className="h-52 shrink-0 lg:h-auto lg:min-h-0 lg:flex-[2]"
+      className="h-52 shrink-0 lg:h-auto lg:min-h-[150px] lg:flex-[2]"
       delay={140}
       right={
         <span className="rounded-sm border border-line bg-raise px-2 py-0.5 font-mono text-[10px] text-dim tabular-nums">

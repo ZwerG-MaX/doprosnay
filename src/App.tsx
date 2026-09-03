@@ -52,16 +52,16 @@ export default function App() {
       <StatusBar sessionStart={sessionStart.current} />
 
       <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-2">
-        {/* левая половина: совместный протокол */}
-        <ProtocolEditor onEvent={addEvent} />
+        {/* левая половина: совместный протокол + журнал событий */}
+        <section className="flex min-h-0 flex-col gap-3">
+          <ProtocolEditor onEvent={addEvent} />
+          <EventLog events={events} />
+        </section>
 
-        {/* правая половина: видеостена + аудиоканал и журнал */}
+        {/* правая половина: видеостена + аудиоканал */}
         <section className="flex min-h-0 flex-col gap-3">
           <CameraWall onEvent={addEvent} onToast={pushToast} />
-          <div className="grid shrink-0 grid-cols-1 gap-3 2xl:grid-cols-2">
-            <CommPanel onEvent={addEvent} />
-            <EventLog events={events} />
-          </div>
+          <CommPanel onEvent={addEvent} />
         </section>
       </main>
 
