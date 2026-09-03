@@ -142,3 +142,22 @@ export const IcChevR = ({ className }: IconProps) => (
     <path d="m9 6 6 6-6 6" />
   </svg>
 );
+
+export const IcChevL = ({ className }: IconProps) => (
+  <svg viewBox="0 0 24 24" className={className} {...S}>
+    <path d="m15 6-6 6 6 6" />
+  </svg>
+);
+
+export const IcClose = ({ className }: IconProps) => (
+  <svg viewBox="0 0 24 24" className={className} {...S}>
+    <path d="m6 6 12 12M18 6 6 18" />
+  </svg>
+);
+
+export const IcPopout = ({ className }: IconProps) => (
+  <svg viewBox="0 0 24 24" className={className} {...S}>
+    <rect x="4" y="4" width="12" height="12" rx="1.4" />
+    <path d="M20 9v10a1 1 0 0 1-1 1H9M14 10l6-6M15 4h5v5" />
+  </svg>
+);
