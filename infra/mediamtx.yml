@@ -1,0 +1,27 @@
+# MediaMTX: мост MACROSCOP (RTSP) → браузер (WebRTC / HLS)
+#
+# В каждом пути source — RTSP-адрес камеры в MACROSCOP VMS.
+# Адрес VMS задайте свой (внутри сети контейнеров — IP/имя хоста, не localhost).
+#
+# Чтение потоков из браузера:
+#   WebRTC (минимальная задержка): http://localhost:8889/cam01
+#   HLS (совместимость):           http://localhost:8888/cam01
+#
+# В коде пульта (src/components/CameraFeed.tsx) замените <img> на <video>
+# с WebRTC-подключением через MediaMTX WHEP API: POST http://localhost:8888/cam01/whep
+
+paths:
+  cam01:
+    source: rtsp://10.77.2.4:554/macroscop/cam01_main
+  cam02:
+    source: rtsp://10.77.2.4:554/macroscop/cam02_main
+  cam03:
+    source: rtsp://10.77.2.4:554/macroscop/cam03_main
+
+# ── общие настройки ──────────────────────────────────────────────
+webrtcAddress: :8889
+hlsAddress: :8888
+rtspAddress: :8554
+
+# При необходимости — логи для отладки:
+logLevel: info

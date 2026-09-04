@@ -1,0 +1,64 @@
+# Реальные сервисы пульта наблюдения «Допросная №2»
+# Запуск: docker compose up -d
+#
+# После старта в админ-панели «Серверы» укажите:
+#   ONLYOFFICE Docs → http://localhost:8080
+#   Mumble          → localhost : 64738
+#   MACROSCOP       → потоки через медиапрокси: http://localhost:8889/<cam>
+
+services:
+  # ── ONLYOFFICE Document Server (совместное редактирование протоколов) ──
+  onlyoffice:
+    image: onlyoffice/documentserver:latest
+    container_name: dopros-oo
+    ports:
+      - "8080:80"
+    environment:
+      # Быстрый старт без JWT. В проде: JWT_ENABLED=true, JWT_SECRET=<секрет> —
+      # тот же секрет вводится в админ-панели «Серверы → ONLYOFFICE».
+      - JWT_ENABLED=false
+    volumes:
+      - oo_data:/var/www/onlyoffice/Data
+    restart: unless-stopped
+
+  # ── Mumble (Murmur) — аудиосервер канала «Допросная» ──
+  mumble:
+    image: mumblevoip/mumble-server:latest
+    container_name: dopros-mumble
+    ports:
+      - "64738:64738"
+      - "64738:64738/udp"
+    volumes:
+      - mumble_data:/data
+    restart: unless-stopped
+
+  # ── MediaMTX — медиапрокси MACROSCOP: RTSP → WebRTC/HLS для браузера ──
+  # Браузер не умеет играть RTSP напрямую; MediaMTX забирает поток у VMS
+  # и отдаёт его как WebRTC (задержка ~0.3 c) и HLS.
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: dopros-mediamtx
+    ports:
+      - "8554:8554"   # RTSP (приём/отдача)
+      - "8888:8888"   # HLS + WebRTC HTTP API
+      - "8889:8889/udp" # WebRTC ICE
+    volumes:
+      - ./infra/mediamtx.yml:/mediamtx.yml:ro
+    restart: unless-stopped
+
+  # ── Хранилище документов: сюда кладутся .docx, доступные Document Server ──
+  # ВАЖНО: ONLYOFFICE DS скачивает документ и шлёт callback САМ (из контейнера),
+  # поэтому localhost браузера ему не виден. Используйте этот сервис или
+  # host.docker.internal / домен, доступный из сети контейнеров.
+  docs:
+    image: nginx:alpine
+    container_name: dopros-docs
+    ports:
+      - "8090:80"
+    volumes:
+      - ./infra/docs:/usr/share/nginx/html:ro
+    restart: unless-stopped
+
+volumes:
+  oo_data:
+  mumble_data:
