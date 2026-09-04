@@ -48,8 +48,6 @@ function Shell() {
     window.setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3400);
   }, []);
 
-  const ptt = usePtt(mumbleOnline, addEvent);
-
   /* пользователь → участник канала */
   const toObs = useCallback(
     (u: UserRec): Observer => {
@@ -59,15 +57,23 @@ function Shell() {
     [users],
   );
 
-  /* подключение к серверу Mumble */
+  /* подключение к серверу Mumble (учитывает флаг enabled из настроек админа) */
+  const mumbleEnabled = config.mumble.enabled;
   useEffect(() => {
+    if (!mumbleEnabled) {
+      setMumbleOnline(false);
+      return;
+    }
     const t = window.setTimeout(() => {
       setMumbleOnline(true);
       addEvent("audio", `Mumble: подключено к ${mumbleUrlOf(config)} · Opus 128 кбит/с`);
     }, 1200);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [mumbleEnabled]);
+
+  const mumbleLive = mumbleOnline && mumbleEnabled;
+  const ptt = usePtt(mumbleLive, addEvent);
 
   /* при входе / смене комнаты — пересобираем канал наблюдателей */
   useEffect(() => {
@@ -178,7 +184,7 @@ function Shell() {
           <CameraWall onEvent={addEvent} onToast={pushToast} ptt={ptt} />
           <CommPanel
             connected={connected}
-            online={mumbleOnline}
+            online={mumbleLive}
             ptt={ptt}
             onJoin={joinNext}
             onLeave={leaveObs}

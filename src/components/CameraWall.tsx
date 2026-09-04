@@ -75,11 +75,19 @@ export function CameraWall({ onEvent, onToast, ptt }: Props) {
     if (c) onEvent("video", `Полноэкранный просмотр: ${c.num} (${room.name})`);
   };
 
+  const vmsOff = !config.macroscop.enabled;
+
   return (
     <Panel
       title="ВИДЕОСТЕНА"
-      sub={`${config.macroscop.host} · ${cams.length} потоков · MACROSCOP`}
-      ledClass="bg-hud shadow-[0_0_8px_rgba(0,176,240,0.8)]"
+      sub={
+        vmsOff
+          ? "видеосервер MACROSCOP отключён администратором"
+          : `${config.macroscop.host} · ${cams.length} потоков · MACROSCOP`
+      }
+      ledClass={
+        vmsOff ? "bg-faint" : "bg-hud shadow-[0_0_8px_rgba(0,176,240,0.8)]"
+      }
       className="min-h-0 flex-1"
       delay={40}
       right={
@@ -94,6 +102,12 @@ export function CameraWall({ onEvent, onToast, ptt }: Props) {
       }
     >
       <div className="flex min-h-0 flex-1 flex-col">
+        {vmsOff && (
+          <div className="mx-2.5 mt-2.5 flex items-center gap-2 rounded-md border border-amber/40 bg-amber/10 px-3 py-2 font-mono text-[10px] tracking-wide text-amber">
+            <IcCam className="h-3.5 w-3.5 shrink-0" />
+            Видеосервер MACROSCOP отключён в настройках. Включите его в панели «Серверы» (админ).
+          </div>
+        )}
         {/* табы комнат (доступные по правам) */}
         {myRooms.length > 1 && (
           <div className="flex shrink-0 gap-1.5 overflow-x-auto px-2.5 pt-2.5">

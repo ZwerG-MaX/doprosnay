@@ -106,6 +106,10 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
 
   /* ---- подключение ONLYOFFICE Docs по конфигурации серверов ---- */
   useEffect(() => {
+    if (!oo.enabled) {
+      setMode("offline");
+      return;
+    }
     let alive = true;
     setMode("connecting");
     onEvent("doc", `ONLYOFFICE: подключение к ${oo.dsUrl} …`);
@@ -142,7 +146,7 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
       editorRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [oo.dsUrl, oo.docUrl, oo.jwt, room.id, canEdit]);
+  }, [oo.enabled, oo.dsUrl, oo.docUrl, oo.jwt, room.id, canEdit]);
 
   /* ---- симуляция правок соавторов (встроенный режим) ---- */
   useEffect(() => {
@@ -186,8 +190,10 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
 
   const words = text.trim() ? text.trim().split(/\s+/).length : 0;
 
-  const statusPill =
-    mode === "online"
+  const ooOff = !oo.enabled;
+  const statusPill = ooOff
+    ? "border-line bg-panel text-faint"
+    : mode === "online"
       ? "border-live/60 bg-live/10 text-live"
       : mode === "connecting"
         ? "border-amber/60 bg-amber/10 text-amber blink-rec"
@@ -200,15 +206,17 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
       className="min-h-[420px] flex-1 lg:min-h-0 lg:flex-[3]"
       delay={120}
       ledClass={
-        mode === "online"
-          ? "bg-live shadow-[0_0_8px_rgba(49,217,138,0.8)]"
-          : "bg-amber shadow-[0_0_8px_rgba(255,138,61,0.8)] blink-rec"
+        ooOff
+          ? "bg-faint"
+          : mode === "online"
+            ? "bg-live shadow-[0_0_8px_rgba(49,217,138,0.8)]"
+            : "bg-amber shadow-[0_0_8px_rgba(255,138,61,0.8)] blink-rec"
       }
       right={
         <span className="flex items-center gap-1.5">
           <span className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[9.5px] tracking-wider ${statusPill}`}>
             <IcSignal className="h-3 w-3" />
-            {mode === "online" ? "DOCS" : mode === "connecting" ? "ПОДКЛ…" : "ОФЛАЙН"}
+            {ooOff ? "ОТКЛЮЧЁН" : mode === "online" ? "DOCS" : mode === "connecting" ? "ПОДКЛ…" : "ОФЛАЙН"}
           </span>
           <button
             onClick={() => {
@@ -225,6 +233,12 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
         </span>
       }
     >
+      {ooOff && (
+        <div className="mx-3 mt-2.5 flex items-center gap-2 rounded-md border border-amber/40 bg-amber/10 px-3 py-2 font-mono text-[10px] tracking-wide text-amber">
+          <IcFile className="h-3.5 w-3.5 shrink-0" />
+          ONLYOFFICE Docs отключён в настройках серверов. Включите его в панели «Серверы» (админ).
+        </div>
+      )}
       {/* строка документа: название, соавторы, права */}
       <div className="flex flex-wrap items-center gap-2 px-3 pt-2.5">
         <IcFile className="h-4 w-4 shrink-0 text-hud" />

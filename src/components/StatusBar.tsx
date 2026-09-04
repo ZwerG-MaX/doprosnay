@@ -41,13 +41,31 @@ export function StatusBar({ sessionStart, onOpenServers, onOpenAccess, onLogout 
       </div>
 
       <div className="ml-auto flex items-center gap-1.5 md:gap-2 lg:ml-0">
-        <span className="hidden items-center gap-1.5 rounded-full border border-line bg-panel2 px-2.5 py-1 font-mono text-[10px] tracking-wider text-dim xl:flex" title={config.macroscop.host}>
-          <span className="led bg-live shadow-[0_0_7px_rgba(49,217,138,0.9)]" />
-          MACROSCOP
+        <span
+          className={`hidden items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] tracking-wider xl:flex ${
+            config.macroscop.enabled
+              ? "border-line bg-panel2 text-dim"
+              : "border-line/60 bg-panel text-faint line-through decoration-faint/60"
+          }`}
+          title={`${config.macroscop.host}:${config.macroscop.port}${config.macroscop.enabled ? "" : " · отключён администратором"}`}
+        >
+          <span
+            className={`led ${
+              config.macroscop.enabled ? "bg-live shadow-[0_0_7px_rgba(49,217,138,0.9)]" : "bg-faint"
+            }`}
+          />
+          MACROSCOP{config.macroscop.enabled ? "" : "·ОТКЛ"}
         </span>
-        <span className="hidden items-center gap-1.5 rounded-full border border-line bg-panel2 px-2.5 py-1 font-mono text-[10px] tracking-wider text-dim xl:flex" title={mumbleUrlOf(config)}>
-          <span className="led bg-hud shadow-[0_0_7px_rgba(0,176,240,0.9)]" />
-          MUMBLE·{latency}мс
+        <span
+          className={`hidden items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] tracking-wider xl:flex ${
+            config.mumble.enabled
+              ? "border-line bg-panel2 text-dim"
+              : "border-line/60 bg-panel text-faint line-through decoration-faint/60"
+          }`}
+          title={`${mumbleUrlOf(config)}${config.mumble.enabled ? "" : " · отключён администратором"}`}
+        >
+          <span className={`led ${config.mumble.enabled ? "bg-hud shadow-[0_0_7px_rgba(0,176,240,0.9)]" : "bg-faint"}`} />
+          MUMBLE{config.mumble.enabled ? `·${latency}мс` : "·ОТКЛ"}
         </span>
         <span className="flex items-center gap-2 rounded-full border border-rec/40 bg-rec/10 px-2.5 py-1">
           <span className="led blink-rec bg-rec shadow-[0_0_8px_rgba(255,77,94,0.9)]" />
@@ -78,10 +96,11 @@ export function StatusBar({ sessionStart, onOpenServers, onOpenAccess, onLogout 
           <>
             <button
               onClick={onOpenServers}
-              title="Серверы подключения (MACROSCOP · Mumble · ONLYOFFICE)"
-              className="grid h-8 w-8 place-items-center rounded-full border border-line bg-panel2 text-dim transition-all hover:border-violet/60 hover:text-violet hover:shadow-[0_0_12px_rgba(122,92,245,0.25)] active:scale-90"
+              title="Редактировать подключения к серверам (MACROSCOP · Mumble · ONLYOFFICE)"
+              className="flex h-8 items-center gap-1.5 rounded-full border border-violet/50 bg-violet/10 px-2.5 text-violet transition-all hover:border-violet hover:bg-violet/20 hover:shadow-[0_0_14px_rgba(122,92,245,0.3)] active:scale-95"
             >
               <IcGear className="h-4 w-4" />
+              <span className="hidden font-mono text-[10px] tracking-widest sm:inline">СЕРВЕРЫ</span>
             </button>
             <button
               onClick={onOpenAccess}

@@ -49,9 +49,9 @@ export interface UserRec {
 }
 
 export interface ServerConfig {
-  macroscop: { host: string; port: number; proto: "rtsp" | "https" };
-  mumble: { host: string; port: number };
-  onlyoffice: { dsUrl: string; jwt: string; docUrl: string };
+  macroscop: { host: string; port: number; proto: "rtsp" | "https"; enabled: boolean };
+  mumble: { host: string; port: number; enabled: boolean };
+  onlyoffice: { dsUrl: string; jwt: string; docUrl: string; enabled: boolean };
 }
 
 /* ── источники видеопотоков ───────────────────────── */
@@ -122,12 +122,13 @@ export const DEFAULT_USERS: UserRec[] = [
 /* ── конфигурация серверов (по умолчанию) ─────────── */
 
 export const DEFAULT_CONFIG: ServerConfig = {
-  macroscop: { host: "vms-2.rt-cloud.local", port: 554, proto: "rtsp" },
-  mumble: { host: "10.77.2.15", port: 64738 },
+  macroscop: { host: "vms-2.rt-cloud.local", port: 554, proto: "rtsp", enabled: true },
+  mumble: { host: "10.77.2.15", port: 64738, enabled: true },
   onlyoffice: {
     dsUrl: "https://docs.rt-cloud.local",
     jwt: "",
     docUrl: "https://nas-2.rt-cloud.local/docs/protokol-doprosa.docx",
+    enabled: true,
   },
 };
 

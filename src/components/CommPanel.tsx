@@ -102,24 +102,42 @@ export function CommPanel({ connected, online, ptt, onJoin, onLeave, onEvent }: 
     );
   };
 
+  const disabledByAdmin = !config.mumble.enabled;
+
   return (
     <Panel
       title="АУДИОКАНАЛ · MUMBLE"
-      sub={`${mumbleUrl} · канал «${room.mumbleChannel}»`}
+      sub={
+        disabledByAdmin
+          ? "сервер отключён администратором"
+          : `${mumbleUrl} · канал «${room.mumbleChannel}»`
+      }
       delay={90}
       className="min-h-0 lg:max-h-[420px]"
       ledClass={
-        online
-          ? "bg-live shadow-[0_0_8px_rgba(49,217,138,0.8)]"
-          : "bg-amber shadow-[0_0_8px_rgba(255,138,61,0.8)] blink-rec"
+        disabledByAdmin
+          ? "bg-faint"
+          : online
+            ? "bg-live shadow-[0_0_8px_rgba(49,217,138,0.8)]"
+            : "bg-amber shadow-[0_0_8px_rgba(255,138,61,0.8)] blink-rec"
       }
       right={
-        <span className="rounded-full border border-line bg-raise px-2 py-0.5 font-mono text-[10px] text-dim tabular-nums">
-          {online ? `${latency} мс` : "подключение…"}
+        <span
+          className={`rounded-full border px-2 py-0.5 font-mono text-[10px] tabular-nums ${
+            disabledByAdmin ? "border-line bg-panel text-faint" : "border-line bg-raise text-dim"
+          }`}
+        >
+          {disabledByAdmin ? "отключён" : online ? `${latency} мс` : "подключение…"}
         </span>
       }
     >
       <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto p-2.5">
+        {disabledByAdmin && (
+          <div className="flex items-center gap-2 rounded-md border border-amber/40 bg-amber/10 px-3 py-2 font-mono text-[10px] tracking-wide text-amber">
+            <IcMicOff className="h-3.5 w-3.5 shrink-0" />
+            Аудиосервер Mumble отключён в настройках. Включите его в панели «Серверы» (админ).
+          </div>
+        )}
         {/* канал допросной */}
         <div>
           <div className={channelHead}>

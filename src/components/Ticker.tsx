@@ -2,13 +2,13 @@ import { useState } from "react";
 import { useInterval, randInt } from "../lib/hooks";
 import { useStore, mumbleUrlOf } from "../lib/store";
 
-function genStats(hosts: { vms: string; mumble: string; docs: string; cams: number }): string[] {
+function genStats(hosts: { vms: string; mumble: string; docs: string; cams: number; on: { vms: boolean; mu: boolean; oo: boolean } }): string[] {
   return [
-    ...Array.from({ length: hosts.cams }, (_, i) => `CAM 0${i + 1} ${(randInt(3600, 4800) / 1000).toFixed(2)} Мбит/с`),
+    ...Array.from({ length: hosts.cams }, (_, i) => `CAM 0${i + 1} ${hosts.on.vms ? (randInt(3600, 4800) / 1000).toFixed(2) : "—"} Мбит/с`),
     `потери пакетов ${(Math.random() * 0.6).toFixed(2)}%`,
-    `Mumble ${randInt(17, 42)} мс`,
+    hosts.on.mu ? `Mumble ${randInt(17, 42)} мс` : "Mumble ОТКЛ",
     `CPU ${randInt(21, 46)}%`,
-    `архив: запись ${randInt(9, 16)} МБ/с`,
+    hosts.on.vms ? `архив: запись ${randInt(9, 16)} МБ/с` : "архив: приостановлен",
     `хранилище 214,6 ГБ из 4 ТБ`,
     hosts.vms,
     hosts.mumble,
@@ -19,10 +19,11 @@ function genStats(hosts: { vms: string; mumble: string; docs: string; cams: numb
 export function Ticker() {
   const { config, room } = useStore();
   const hosts = {
-    vms: config.macroscop.host,
-    mumble: mumbleUrlOf(config),
-    docs: config.onlyoffice.dsUrl,
+    vms: config.macroscop.enabled ? config.macroscop.host : `${config.macroscop.host} · ОТКЛ`,
+    mumble: config.mumble.enabled ? mumbleUrlOf(config) : "mumble · ОТКЛ",
+    docs: config.onlyoffice.enabled ? config.onlyoffice.dsUrl : `${config.onlyoffice.dsUrl} · ОТКЛ`,
     cams: room.cameras.length,
+    on: { vms: config.macroscop.enabled, mu: config.mumble.enabled, oo: config.onlyoffice.enabled },
   };
   const [stats, setStats] = useState<string[]>(() => genStats(hosts));
   useInterval(() => setStats(genStats(hosts)), 2400);
