@@ -9,6 +9,7 @@ import { LoginScreen } from "./components/LoginScreen";
 import { ServerSettingsModal } from "./components/ServerSettingsModal";
 import { AccessManager } from "./components/AccessManager";
 import { LogViewer } from "./components/LogViewer";
+import { TemplateManager } from "./components/TemplateManager";
 import { IcShield } from "./components/Icons";
 import { StoreProvider, mumbleUrlOf, useStore } from "./lib/store";
 import {
@@ -32,6 +33,7 @@ function Shell() {
   const [serversOpen, setServersOpen] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
 
   const sessionStart = useRef(Date.now());
   const scheduled = useRef<Set<string>>(new Set());
@@ -171,6 +173,7 @@ function Shell() {
         sessionStart={sessionStart.current}
         onOpenServers={() => setServersOpen(true)}
         onOpenAccess={() => setAccessOpen(true)}
+        onOpenTemplates={() => setTemplatesOpen(true)}
         onOpenLogs={() => setLogsOpen(true)}
         onLogout={logout}
       />
@@ -207,6 +210,7 @@ function Shell() {
         />
       )}
       {accessOpen && <AccessManager onClose={() => setAccessOpen(false)} onToast={pushToast} />}
+      {templatesOpen && <TemplateManager onClose={() => setTemplatesOpen(false)} onToast={pushToast} />}
       {logsOpen && <LogViewer onClose={() => setLogsOpen(false)} onToast={pushToast} />}
 
       {/* уведомления */}
