@@ -1,6 +1,8 @@
 /* Интеграция с ONLYOFFICE Docs (Document Server) через официальный JS API.
    См.: https://api.onlyoffice.com/docs/docs-api/usage-api/ */
 
+import { log } from "./logger";
+
 export interface OOUser {
   id: string;
   name: string;
@@ -58,17 +60,26 @@ let pendingFor = "";
 
 /** Загружает api.js с Document Server. Резолвится, когда доступен window.DocsAPI. */
 export function loadDocsApi(server: string): Promise<void> {
-  if (window.DocsAPI) return Promise.resolve();
-  if (pending && pendingFor === server) return pending;
+  if (window.DocsAPI) {
+    log.debug("ONLYOFFICE", "DocsAPI уже загружен, повторная загрузка не требуется");
+    return Promise.resolve();
+  }
+  if (pending && pendingFor === server) {
+    log.debug("ONLYOFFICE", "Загрузка api.js уже выполняется для этого сервера, ожидаем", server);
+    return pending;
+  }
+
+  const url = apiScriptUrl(server);
+  log.info("ONLYOFFICE", "Начинаем загрузку api.js с Document Server", url);
 
   pendingFor = server;
   pending = new Promise<void>((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = apiScriptUrl(server);
+    script.src = url;
     script.async = true;
 
     const timer = window.setTimeout(() => {
-      fail(new Error("Превышено время ожидания ответа сервера"));
+      fail(new Error("Превышено время ожидания ответа сервера (7 сек)"));
     }, 7000);
 
     const fail = (err: Error) => {
@@ -78,24 +89,25 @@ export function loadDocsApi(server: string): Promise<void> {
       script.remove();
       pending = null;
       pendingFor = "";
+      log.error("ONLYOFFICE", "Сбой загрузки api.js", err.message);
       reject(err);
     };
 
     script.onload = () => {
       window.clearTimeout(timer);
-      if (window.DocsAPI) resolve();
-      else fail(new Error("Сервер ответил, но DocsAPI не найден"));
+      if (window.DocsAPI) {
+        log.info("ONLYOFFICE", "api.js загружен, DocsAPI доступен", url);
+        resolve();
+      } else {
+        fail(new Error("Сервер ответил, но window.DocsAPI не найден — возможно, это не ONLYOFFICE Document Server"));
+      }
     };
-    script.onerror = () => fail(new Error("Не удалось загрузить api.js — сервер недоступен"));
+    script.onerror = () =>
+      fail(new Error("Не удалось загрузить api.js — сервер недоступен (CORS, сеть, неверный адрес или смешанный контент http/https)"));
 
     document.head.appendChild(script);
   });
   return pending;
-}
-
-/** Быстрая проверка доступности Document Server (загрузка api.js + DocsAPI). */
-export async function checkOnlyOfficeServer(server: string): Promise<void> {
-  await loadDocsApi(server);
 }
 
 export function buildEditorConfig(opts: {
@@ -133,6 +145,33 @@ export function buildEditorConfig(opts: {
     width: "100%",
     height: "100%",
   };
+}
+
+/**
+ * Проверка доступности Document Server: загружает api.js и убеждается,
+ * что появился window.DocsAPI. Бросает исключение с диагностикой при сбое.
+ */
+export async function checkOnlyOfficeServer(server: string): Promise<void> {
+  const url = apiScriptUrl(server);
+  log.info("ONLYOFFICE", "Проверка подключения к Document Server", server);
+
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(url, { method: "HEAD", mode: "no-cors", signal: controller.signal });
+    window.clearTimeout(timer);
+    log.debug("ONLYOFFICE", `HEAD-запрос к api.js завершён (opaque-ответ, статус ${res.status})`, url);
+  } catch (e) {
+    window.clearTimeout(timer);
+    const msg = e instanceof Error ? e.message : String(e);
+    log.error("ONLYOFFICE", "HEAD-запрос к api.js не прошёл", msg);
+    throw new Error(
+      `Сервер не отвечает на ${url}. Проверьте адрес, порт, что это ONLYOFFICE Document Server, и отсутствие блокировки смешанного контента (http/https).`,
+    );
+  }
+
+  await loadDocsApi(server);
+  log.info("ONLYOFFICE", "Проверка пройдена: DocsAPI доступен");
 }
 
 /** Уникальный ключ версии документа (меняется при каждом сохранении). */

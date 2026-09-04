@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { useNow, useInterval, fmtClock, fmtDate, fmtDur, randInt } from "../lib/hooks";
 import { useStore, mumbleUrlOf } from "../lib/store";
-import { RtMark, IcGear, IcUsers, IcLogout, IcShield } from "./Icons";
+import { RtMark, IcGear, IcUsers, IcLogout, IcShield, IcFile } from "./Icons";
 
 interface Props {
   sessionStart: number;
   onOpenServers: () => void;
   onOpenAccess: () => void;
+  onOpenLogs: () => void;
   onLogout: () => void;
 }
 
-export function StatusBar({ sessionStart, onOpenServers, onOpenAccess, onLogout }: Props) {
+export function StatusBar({ sessionStart, onOpenServers, onOpenAccess, onOpenLogs, onLogout }: Props) {
   const now = useNow(1000);
   const { config, me, room } = useStore();
   const [latency, setLatency] = useState(24);
@@ -111,6 +112,14 @@ export function StatusBar({ sessionStart, onOpenServers, onOpenAccess, onLogout 
             </button>
           </>
         )}
+
+        <button
+          onClick={onOpenLogs}
+          title="Журнал диагностики (логи подключений)"
+          className="grid h-8 w-8 place-items-center rounded-full border border-line bg-panel2 text-dim transition-all hover:border-amber/60 hover:text-amber hover:shadow-[0_0_12px_rgba(255,138,61,0.25)] active:scale-90"
+        >
+          <IcFile className="h-4 w-4" />
+        </button>
 
         <button
           onClick={onLogout}
