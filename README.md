@@ -18,11 +18,19 @@ Web-пульт для комнаты наблюдения при допросн�
                  │  cloud.local  →  cloud     (Nextcloud, SQLite — хранилище)         │
                  └────────────────────────────────────────────────────────────────────┘
    Mumble  ──►  mumble  :64738 (tcp/udp)
-   MACROSCOP ─►  media (MediaMTX) :8554 RTSP · :8888 HLS/API · :8889/:8890 WebRTC
+   Видео   ──►  vms-demo (демо-VMS, RTSP) ─► media (MediaMTX) ─► браузер
+                  :9554-9556 RTSP        :8554 RTSP · :8888 HLS/API · :8889/:8890 WebRTC
 ```
 
 Сервисы обращаются друг к другу по именам compose-сети: Document Server скачивает
 документы из Nextcloud как `http://cloud/...` — без «внешних» адресов.
+
+> **Где MACROSCOP?** Это коммерческая VMS — официального публичного Docker-образа
+> нет, её разворачивают на выделенном сервере/регистраторе. В демо-стеке её роль
+> играет сервис **`vms-demo`** (ffmpeg-источник, отдаёт тестовые RTSP-таблицы с
+> таймкодом). MediaMTX — универсальный мост, поэтому для реального MACROSCOP
+> достаточно удалить `vms-demo` и прописать RTSP-адреса камер VMS в
+> `infra/mediamtx.yml` (поле `source` у `cam01…cam03`). Остальной стек не меняется.
 
 ---
 
@@ -105,8 +113,10 @@ Nextcloud поднят в минимальной конфигурации: вс�
   Точка замены — `src/lib/usePtt.ts` (вместо эмуляции PTT подключается
   `MumbleConnector`).
 - **MACROSCOP.** VMS отдаёт RTSP, браузер его не играет. Связка:
-  `MACROSCOP (RTSP) → MediaMTX → WebRTC → <video>`. RTSP-адреса камер —
-  в `infra/mediamtx.yml`. Проверка потока: `http://localhost:8889/cam01`.
+  `VMS (RTSP) → MediaMTX → WebRTC → <video>`. По умолчанию источником служит
+  демо-VMS (`vms-demo`, тестовые таблицы с таймкодом); для реального MACROSCOP
+  пропишите RTSP-адреса камер в `infra/mediamtx.yml`. Проверка потока:
+  `http://localhost:8889/cam01` (или HLS `http://localhost:8888/cam01`).
   Точка замены — `src/components/CameraFeed.tsx` (`<img>` → `<video>` + WHEP
   API MediaMTX: `POST http://localhost:8888/cam01/whep`).
 

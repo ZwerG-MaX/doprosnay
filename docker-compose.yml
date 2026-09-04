@@ -98,10 +98,12 @@ services:
       - mumble_data:/data
     restart: unless-stopped
 
-  # ── MediaMTX: мост MACROSCOP (RTSP) → WebRTC/HLS для браузера ──
+  # ── MediaMTX: мост «VMS (RTSP) → WebRTC/HLS» для браузера ──
   media:
     image: bluenviron/mediamtx:latest
     container_name: rt-media
+    depends_on:
+      - vms-demo
     volumes:
       - ./infra/mediamtx.yml:/mediamtx.yml:ro
     ports:
@@ -109,6 +111,32 @@ services:
       - "8888:8888"        # HLS + HTTP API
       - "8889:8889"        # WebRTC (сигналинг)
       - "8890:8890/udp"    # WebRTC (медиа)
+    restart: unless-stopped
+
+  # ── Демо-VMS: эмулятор MACROSCOP (3 тестовых RTSP-потока с таймкодом) ──
+  #    MACROSCOP — коммерческая VMS без публичного образа, поэтому в демо
+  #    её роль играет ffmpeg-источник. Для реального VMS удалите этот сервис
+  #    и пропишите RTSP-адреса ваших камер в infra/mediamtx.yml.
+  vms-demo:
+    image: jrottenberg/ffmpeg:6.1-alpine
+    container_name: rt-vms-demo
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        ffmpeg -re -f lavfi -i testsrc2=size=1280x720:rate=25 \
+          -c:v libx264 -preset ultrafast -tune zerolatency -g 50 -pix_fmt yuv420p \
+          -f rtsp rtsp://0.0.0.0:8554/cam01 &
+        ffmpeg -re -f lavfi -i testsrc2=size=1920x1080:rate=25 \
+          -c:v libx264 -preset ultrafast -tune zerolatency -g 50 -pix_fmt yuv420p \
+          -f rtsp rtsp://0.0.0.0:8555/cam02 &
+        ffmpeg -re -f lavfi -i smptebars=size=1280x720:rate=25 \
+          -c:v libx264 -preset ultrafast -tune zerolatency -g 50 -pix_fmt yuv420p \
+          -f rtsp rtsp://0.0.0.0:8556/cam03 &
+        wait
+    ports:
+      - "9554:8554"        # RTSP cam01 (демо)
+      - "9555:8555"        # RTSP cam02 (демо)
+      - "9556:8556"        # RTSP cam03 (демо)
     restart: unless-stopped
 
 volumes:

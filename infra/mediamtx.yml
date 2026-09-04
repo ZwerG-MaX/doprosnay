@@ -1,9 +1,14 @@
-# MediaMTX: мост MACROSCOP (RTSP) → браузер (WebRTC / HLS)
+# MediaMTX: мост «VMS (RTSP) → браузер (WebRTC / HLS)»
 #
-# В каждом пути source — RTSP-адрес камеры в MACROSCOP VMS.
-# Адрес VMS задайте свой (внутри сети контейнеров — IP/имя хоста, не localhost).
+# ── Источники ────────────────────────────────────────────────────
+# По умолчанию source указывает на демо-VMS (сервис vms-demo в docker-compose),
+# который отдаёт тестовые RTSP-таблицы с таймкодом — эмуляция MACROSCOP.
 #
-# Чтение потоков из браузера:
+# Для РЕАЛЬНОГО MACROSCOP замените каждый source на RTSP-адрес камеры VMS,
+# например:  rtsp://<ip-vms>:554/macroscop/cam01_main
+# (внутри сети контейнеров — IP/имя хоста VMS, не localhost).
+#
+# ── Чтение потоков из браузера ───────────────────────────────────
 #   WebRTC (минимальная задержка): http://localhost:8889/cam01
 #   HLS (совместимость):           http://localhost:8888/cam01
 #
@@ -12,16 +17,19 @@
 
 paths:
   cam01:
-    source: rtsp://10.77.2.4:554/macroscop/cam01_main
+    source: rtsp://vms-demo:8554/cam01
   cam02:
-    source: rtsp://10.77.2.4:554/macroscop/cam02_main
+    source: rtsp://vms-demo:8555/cam02
   cam03:
-    source: rtsp://10.77.2.4:554/macroscop/cam03_main
+    source: rtsp://vms-demo:8556/cam03
 
 # ── общие настройки ──────────────────────────────────────────────
 webrtcAddress: :8889
 hlsAddress: :8888
 rtspAddress: :8554
+
+# Медиа-порт WebRTC (UDP) должен совпадать с пробросом в compose (8890)
+webrtcUDPAddress: :8890
 
 # При необходимости — логи для отладки:
 logLevel: info
