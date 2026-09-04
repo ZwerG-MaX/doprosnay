@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { StatusBar } from "./components/StatusBar";
 import { CameraWall } from "./components/CameraWall";
 import { CommPanel } from "./components/CommPanel";
-import { ProtocolEditor } from "./components/ProtocolEditor";
-import { EventLog } from "./components/EventLog";
+import { DocumentPanel } from "./components/DocumentPanel";
+import { CollaborationFeed } from "./components/CollaborationFeed";
 import { Ticker } from "./components/Ticker";
 import { OBSERVERS, MUMBLE_URL, type EventItem, type EventType, type Observer } from "./lib/data";
 import { fmtClock, useInterval } from "./lib/hooks";
@@ -101,10 +101,10 @@ export default function App() {
       <StatusBar sessionStart={sessionStart.current} />
 
       <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-2">
-        {/* левая половина: протокол + журнал */}
+        {/* левая половина: документ ONLYOFFICE + активность */}
         <section className="flex min-h-0 flex-col gap-3">
-          <ProtocolEditor observers={connected} onEvent={addEvent} onToast={pushToast} />
-          <EventLog events={events} />
+          <DocumentPanel observers={connected} onEvent={addEvent} onToast={pushToast} />
+          <CollaborationFeed events={events} />
         </section>
 
         {/* правая половина: видеостена + аудиоканал */}
