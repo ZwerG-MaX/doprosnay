@@ -5,5 +5,5 @@ dist
 Dockerfile
 .dockerignore
 docker-compose.yml
-infra/docs
+infra
 README.md
