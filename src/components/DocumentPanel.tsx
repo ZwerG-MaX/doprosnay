@@ -6,9 +6,10 @@ import { fmtClock, randInt } from "../lib/hooks";
 import {
   loadDocsApi,
   buildEditorConfig,
-  downloadDocument,
   type DocsEditorInstance,
 } from "../lib/onlyoffice";
+import { buildProtocolDocx, docxFilename } from "../lib/docxgen";
+import { downloadBlob, getTemplateFile } from "../lib/filedb";
 import { Panel } from "./Panel";
 import { IcSignal, IcSave, IcFile, IcPen, IcEye, IcTemplate } from "./Icons";
 
@@ -66,6 +67,18 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
   const [ribbon, setRibbon] = useState<RemoteEdit | null>(null);
   const [ribbonFade, setRibbonFade] = useState(false);
   const [tplOpen, setTplOpen] = useState(false);
+  const [tplFileName, setTplFileName] = useState<string | null>(null);
+
+  /* имя загруженного docx-шаблона комнаты (для чипа) */
+  useEffect(() => {
+    let alive = true;
+    getTemplateFile(room.id)
+      .then((f) => alive && setTplFileName(f ? f.name : null))
+      .catch(() => alive && setTplFileName(null));
+    return () => {
+      alive = false;
+    };
+  }, [room.id, templateTick]);
 
   const taRef = useRef<HTMLTextAreaElement>(null);
   const placeholderRef = useRef<HTMLDivElement>(null);
@@ -153,6 +166,31 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
     persist(seedDoc);
     onEvent("doc", `Документ перезаписан по шаблону комнаты ${room.code}`);
     onToast(`Документ заменён шаблоном «${room.code}»`);
+  };
+
+  /* ---- выгрузка протокола как полноценного .docx ---- */
+  const [exporting, setExporting] = useState(false);
+  const exportDocx = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const blob = await buildProtocolDocx({
+        title: docTitle.trim() || `Протокол наблюдения · ${room.code}`,
+        roomCode: room.code,
+        roomName: room.name,
+        content: textRef.current,
+        authors: observers.map((o) => `${o.tag} ${o.name}`),
+      });
+      const name = docxFilename(docTitle.trim() || `protokol_${room.code}`);
+      downloadBlob(blob, name);
+      onToast(`Протокол выгружен: ${name}`);
+      onEvent("doc", `Документ выгружен как .docx: ${name}`);
+    } catch (err) {
+      log.error("DOCX", "Ошибка формирования протокола .docx", err instanceof Error ? err.message : String(err));
+      onToast("Не удалось сформировать .docx");
+    } finally {
+      setExporting(false);
+    }
   };
 
   /* ---- подключение ONLYOFFICE Docs по конфигурации серверов ---- */
@@ -321,16 +359,13 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
             </span>
           )}
           <button
-            onClick={() => {
-              const name = downloadDocument(docTitle, textRef.current);
-              onToast(`Файл сформирован: ${name}`);
-              onEvent("doc", `Документ выгружен: ${name}`);
-            }}
-            className="rt-grad-bg flex h-7 items-center gap-1.5 rounded-md px-2.5 font-display text-[9.5px] tracking-[0.16em] text-white transition-all hover:brightness-110 active:scale-95"
-            title="Скачать документ"
+            onClick={exportDocx}
+            disabled={exporting}
+            className="rt-grad-bg flex h-7 items-center gap-1.5 rounded-md px-2.5 font-display text-[9.5px] tracking-[0.16em] text-white transition-all hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:saturate-50"
+            title="Скачать протокол как документ .docx"
           >
             <IcSave className="h-3.5 w-3.5" />
-            PDF
+            {exporting ? "…" : "DOCX"}
           </button>
         </span>
       }
@@ -349,6 +384,15 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
           onChange={(e) => setDocTitle(e.target.value)}
           className="h-7 min-w-[160px] flex-1 rounded-md border border-transparent bg-transparent px-2 font-mono text-[11.5px] text-fg outline-none transition-all hover:border-line focus:border-hud/60 focus:bg-panel2"
         />
+        {tplFileName && (
+          <span
+            className="flex items-center gap-1.5 rounded-full border border-violet/50 bg-violet/10 px-2 py-0.5 font-mono text-[9px] tracking-wider text-violet"
+            title={`Документ создан на основе docx-шаблона: ${tplFileName}`}
+          >
+            <IcFile className="h-3 w-3" />
+            <span className="max-w-[120px] truncate">{tplFileName}</span>
+          </span>
+        )}
         <span
           className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[9px] tracking-wider ${
             canEdit ? "border-live/50 bg-live/10 text-live" : "border-line bg-panel2 text-faint"

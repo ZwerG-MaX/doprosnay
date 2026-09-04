@@ -1,8 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { createPortal } from "react-dom";
 import { ROOMS, TEMPLATE_VARS, TEMPLATE_SNIPPETS, DEFAULT_TEMPLATES } from "../lib/data";
 import { useStore } from "../lib/store";
-import { IcTemplate, IcClose, IcSave, IcRefresh, IcCam } from "./Icons";
+import { log } from "../lib/logger";
+import {
+  saveTemplateFile,
+  getTemplateFile,
+  deleteTemplateFile,
+  downloadBlob,
+  formatSize,
+  type FileMeta,
+} from "../lib/filedb";
+import { buildTemplateDocx, docxFilename } from "../lib/docxgen";
+import { IcTemplate, IcClose, IcSave, IcRefresh, IcCam, IcFile, IcTrash, IcPlus } from "./Icons";
 
 interface Props {
   onClose: () => void;
@@ -18,16 +28,111 @@ export function TemplateManager({ onClose, onToast }: Props) {
     return init;
   });
   const [armed, setArmed] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [files, setFiles] = useState<Record<string, FileMeta | null>>({});
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const active = ROOMS.find((r) => r.id === activeId) ?? ROOMS[0];
   const draft = drafts[activeId] ?? "";
+  const activeFile = files[activeId] ?? null;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  /* метаинформация о загруженных docx-файлах */
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const map: Record<string, FileMeta | null> = {};
+      for (const r of ROOMS) {
+        try {
+          const f = await getTemplateFile(r.id);
+          map[r.id] = f ? { name: f.name, size: f.size, at: f.at } : null;
+        } catch {
+          map[r.id] = null;
+        }
+      }
+      if (alive) setFiles(map);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const onUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f) return;
+    if (!/\.docx$/i.test(f.name)) {
+      onToast("Поддерживаются только файлы .docx");
+      return;
+    }
+    if (f.size > 8 * 1024 * 1024) {
+      onToast("Файл больше 8 МБ — загрузите документ меньшего размера");
+      return;
+    }
+    setUploading(true);
+    try {
+      const arrayBuffer = await f.arrayBuffer();
+      const mammoth = (await import("mammoth")).default;
+      const { value } = await mammoth.extractRawText({ arrayBuffer });
+      await saveTemplateFile(activeId, {
+        blob: new Blob([arrayBuffer], {
+          type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        }),
+        name: f.name,
+        size: f.size,
+        at: new Date().toISOString(),
+      });
+      const at = new Date().toISOString();
+      setFiles((prev) => ({ ...prev, [activeId]: { name: f.name, size: f.size, at } }));
+      const text = value.trim();
+      if (text) {
+        setDrafts((prev) => ({ ...prev, [activeId]: text }));
+        setArmed(false);
+      }
+      log.info("TEMPLATE", `Загружен DOCX-шаблон для комнаты ${active.code}`, `${f.name} · ${formatSize(f.size)}`);
+      onToast(text ? `«${f.name}» загружен, текст извлечён в редактор` : `«${f.name}» загружен`);
+    } catch (err) {
+      log.error("TEMPLATE", "Не удалось прочитать .docx", err instanceof Error ? err.message : String(err));
+      onToast("Не удалось прочитать файл .docx");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const onDeleteFile = async () => {
+    try {
+      await deleteTemplateFile(activeId);
+      setFiles((prev) => ({ ...prev, [activeId]: null }));
+      log.info("TEMPLATE", `DOCX-файл шаблона удалён для комнаты ${active.code}`);
+      onToast("Файл шаблона удалён — остался текстовый шаблон");
+    } catch {
+      onToast("Не удалось удалить файл");
+    }
+  };
+
+  const onDownloadDocx = async () => {
+    try {
+      const stored = await getTemplateFile(activeId);
+      if (stored) {
+        downloadBlob(stored.blob, stored.name);
+        onToast(`Выгружен исходный файл: ${stored.name}`);
+        return;
+      }
+      const blob = await buildTemplateDocx(`Шаблон протокола · ${active.code}`, draft);
+      downloadBlob(blob, docxFilename(`shablon_${active.code}`));
+      onToast("Текстовый шаблон выгружен как .docx");
+      log.info("TEMPLATE", `Шаблон ${active.code} выгружен в .docx`);
+    } catch (err) {
+      log.error("TEMPLATE", "Ошибка формирования .docx", err instanceof Error ? err.message : String(err));
+      onToast("Не удалось сформировать .docx");
+    }
+  };
 
   const usedVars = useMemo(
     () => TEMPLATE_VARS.filter((v) => draft.includes(v)),
@@ -156,6 +261,62 @@ export function TemplateManager({ onClose, onToast }: Props) {
             </div>
           </div>
 
+          {/* DOCX-файл шаблона */}
+          <div className="flex flex-wrap items-center gap-2.5 rounded-lg border border-line bg-panel2/50 px-3 py-2.5">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".docx"
+              className="hidden"
+              onChange={onUpload}
+            />
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md border border-line bg-panel text-violet">
+              <IcFile className="h-4 w-4" />
+            </span>
+            {activeFile ? (
+              <>
+                <div className="min-w-0">
+                  <div className="truncate font-mono text-[11px] font-semibold text-fg">
+                    {activeFile.name}
+                  </div>
+                  <div className="font-mono text-[9px] tracking-wider text-faint">
+                    {formatSize(activeFile.size)} · загружен {new Date(activeFile.at).toLocaleString("ru-RU")}
+                  </div>
+                </div>
+                <button
+                  onClick={onDeleteFile}
+                  title="Удалить docx-файл шаблона"
+                  className="ml-auto grid h-7 w-7 shrink-0 place-items-center rounded-md border border-line bg-panel text-faint transition-all hover:border-rec/60 hover:text-rec active:scale-90"
+                >
+                  <IcTrash className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-line bg-panel px-2.5 font-mono text-[9.5px] tracking-widest text-dim transition-all hover:border-violet/50 hover:text-violet active:scale-95"
+                >
+                  ЗАМЕНИТЬ
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="min-w-0">
+                  <div className="font-mono text-[11px] text-dim">Файл шаблона не загружен</div>
+                  <div className="font-mono text-[9px] tracking-wider text-faint">
+                    загрузите .docx — текст извлечётся в редактор, файл сохранится для ONLYOFFICE
+                  </div>
+                </div>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="ml-auto flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-violet/50 bg-violet/10 px-3 font-mono text-[9.5px] tracking-widest text-violet transition-all hover:bg-violet/20 active:scale-95 disabled:opacity-50"
+                >
+                  <IcPlus className="h-3.5 w-3.5" />
+                  {uploading ? "ЧТЕНИЕ…" : "ЗАГРУЗИТЬ .DOCX"}
+                </button>
+              </>
+            )}
+          </div>
+
           {/* редактор шаблона */}
           <div className="flex min-h-[260px] flex-col rounded-lg border border-line bg-panel2/50">
             <div className="flex items-center justify-between border-b border-line px-3 py-2">
@@ -201,6 +362,14 @@ export function TemplateManager({ onClose, onToast }: Props) {
             title="Перезаписать документ комнаты по этому шаблону"
           >
             {armed ? "ТОЧНО ПЕРЕЗАПИСАТЬ?" : "ПРИМЕНИТЬ К ДОКУМЕНТУ"}
+          </button>
+          <button
+            onClick={onDownloadDocx}
+            className="flex h-9 items-center gap-1.5 rounded-md border border-violet/50 bg-violet/10 px-3 font-mono text-[10px] tracking-widest text-violet transition-all hover:bg-violet/20 active:scale-95"
+            title={activeFile ? "Скачать исходный docx-файл" : "Выгрузить текстовый шаблон как .docx"}
+          >
+            <IcFile className="h-3.5 w-3.5" />
+            СКАЧАТЬ .DOCX
           </button>
           <span className="ml-auto font-mono text-[9.5px] text-faint">
             {isDirty ? "не сохранено" : "сохранено"}
