@@ -1,64 +1,119 @@
-# Реальные сервисы пульта наблюдения «Допросная №2»
-# Запуск: docker compose up -d
+# ═══════════════════════════════════════════════════════════════
+#  Пульт наблюдения «Допросная №2» · единый стек через Traefik
 #
-# После старта в админ-панели «Серверы» укажите:
-#   ONLYOFFICE Docs → http://localhost:8080
-#   Mumble          → localhost : 64738
-#   MACROSCOP       → потоки через медиапрокси: http://localhost:8889/<cam>
+#  Домены (добавьте в /etc/hosts или DNS):
+#    127.0.0.1  pult.local docs.local cloud.local
+#
+#  Поднять всё:   docker compose up -d --build
+#  Журналы:       docker compose logs -f
+#  Traefik-дашборд (dev):  http://localhost:8080
+# ═══════════════════════════════════════════════════════════════
 
 services:
-  # ── ONLYOFFICE Document Server (совместное редактирование протоколов) ──
-  onlyoffice:
-    image: onlyoffice/documentserver:latest
-    container_name: dopros-oo
+  # ── Traefik: единая точка входа, маршрутизация по доменам ──
+  traefik:
+    image: traefik:v3.1
+    container_name: rt-traefik
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"                 # дев-режим: дашборд на :8080
+      - "--log.level=INFO"
+      # Для боевого домена + HTTPS (Let's Encrypt) раскомментируйте:
+      # - "--entrypoints.websecure.address=:443"
+      # - "--certificatesresolvers.le.acme.tlschallenge=true"
+      # - "--certificatesresolvers.le.acme.email=it@example.ru"
+      # - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
     ports:
-      - "8080:80"
-    environment:
-      # Быстрый старт без JWT. В проде: JWT_ENABLED=true, JWT_SECRET=<секрет> —
-      # тот же секрет вводится в админ-панели «Серверы → ONLYOFFICE».
-      - JWT_ENABLED=false
+      - "80:80"
+      - "8080:8080"                           # Traefik dashboard (только dev!)
     volumes:
-      - oo_data:/var/www/onlyoffice/Data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # - traefik_certs:/letsencrypt
     restart: unless-stopped
 
-  # ── Mumble (Murmur) — аудиосервер канала «Допросная» ──
+  # ── Пульт наблюдения (собирается из Dockerfile) ──
+  frontend:
+    build: .
+    container_name: rt-pult
+    depends_on:
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pult.rule=Host(`pult.local`) || Host(`localhost`) || Host(`127.0.0.1`)"
+      - "traefik.http.routers.pult.entrypoints=web"
+      - "traefik.http.services.pult.loadbalancer.server.port=80"
+    restart: unless-stopped
+
+  # ── ONLYOFFICE Document Server ──
+  docs:
+    image: onlyoffice/documentserver:latest
+    container_name: rt-docs
+    environment:
+      JWT_ENABLED: "false"                    # в проде включите и впишите тот же секрет в панели «Серверы»
+      JWT_SECRET: "rt-docs-secret-change-me"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.docs.rule=Host(`docs.local`)"
+      - "traefik.http.routers.docs.entrypoints=web"
+      - "traefik.http.services.docs.loadbalancer.server.port=80"
+    volumes:
+      - docs_data:/var/www/onlyoffice/Data
+      - docs_log:/var/log/onlyoffice
+      - docs_cache:/var/lib/onlyoffice
+    restart: unless-stopped
+
+  # ── Nextcloud: минимальное хранилище документов (SQLite, apache) ──
+  cloud:
+    image: nextcloud:apache
+    container_name: rt-cloud
+    environment:
+      NEXTCLOUD_ADMIN_USER: admin
+      NEXTCLOUD_ADMIN_PASSWORD: rt-cloud-2026
+      NEXTCLOUD_TRUSTED_DOMAINS: "cloud.local localhost"
+      NEXTCLOUD_DEFAULT_PHONE_REGION: "RU"
+      # без внешних БД → автоматически используется встроенная SQLite
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cloud.rule=Host(`cloud.local`)"
+      - "traefik.http.routers.cloud.entrypoints=web"
+      - "traefik.http.services.cloud.loadbalancer.server.port=80"
+    volumes:
+      - cloud_data:/var/www/html
+    restart: unless-stopped
+
+  # ── Mumble (Murmur): голосовой сервер ──
   mumble:
     image: mumblevoip/mumble-server:latest
-    container_name: dopros-mumble
+    container_name: rt-mumble
+    environment:
+      MUMBLE_SUPERUSER_PASSWORD: "rt-mumble-2026"
+      MUMBLE_CONFIG_WELCOMETEXT: "Пульт наблюдения · Допросная · Ростелеком"
     ports:
-      - "64738:64738"
+      - "64738:64738/tcp"
       - "64738:64738/udp"
     volumes:
       - mumble_data:/data
     restart: unless-stopped
 
-  # ── MediaMTX — медиапрокси MACROSCOP: RTSP → WebRTC/HLS для браузера ──
-  # Браузер не умеет играть RTSP напрямую; MediaMTX забирает поток у VMS
-  # и отдаёт его как WebRTC (задержка ~0.3 c) и HLS.
-  mediamtx:
+  # ── MediaMTX: мост MACROSCOP (RTSP) → WebRTC/HLS для браузера ──
+  media:
     image: bluenviron/mediamtx:latest
-    container_name: dopros-mediamtx
-    ports:
-      - "8554:8554"   # RTSP (приём/отдача)
-      - "8888:8888"   # HLS + WebRTC HTTP API
-      - "8889:8889/udp" # WebRTC ICE
+    container_name: rt-media
     volumes:
       - ./infra/mediamtx.yml:/mediamtx.yml:ro
-    restart: unless-stopped
-
-  # ── Хранилище документов: сюда кладутся .docx, доступные Document Server ──
-  # ВАЖНО: ONLYOFFICE DS скачивает документ и шлёт callback САМ (из контейнера),
-  # поэтому localhost браузера ему не виден. Используйте этот сервис или
-  # host.docker.internal / домен, доступный из сети контейнеров.
-  docs:
-    image: nginx:alpine
-    container_name: dopros-docs
     ports:
-      - "8090:80"
-    volumes:
-      - ./infra/docs:/usr/share/nginx/html:ro
+      - "8554:8554"        # RTSP
+      - "8888:8888"        # HLS + HTTP API
+      - "8889:8889"        # WebRTC (сигналинг)
+      - "8890:8890/udp"    # WebRTC (медиа)
     restart: unless-stopped
 
 volumes:
-  oo_data:
+  docs_data:
+  docs_log:
+  docs_cache:
+  cloud_data:
   mumble_data:

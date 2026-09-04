@@ -1,10 +1,13 @@
-Положите сюда файлы документов (.docx), которые будет открывать ONLYOFFICE Document Server.
+Хранилище документов — Nextcloud (сервис `cloud` в docker-compose.yml).
 
-Пример:
-  infra/docs/protokol-doprosa.docx  →  будет доступен как
-  http://docs:80/protokol-doprosa.docx      (из сети контейнеров — для Document Server)
-  http://localhost:8090/protokol-doprosa.docx  (из браузера — для проверки)
+Рабочий процесс:
+1. Откройте http://cloud.local  (админ: admin / rt-cloud-2026).
+2. Загрузите .docx-протоколы через веб-интерфейс или WebDAV:
+     http://cloud.local/remote.php/dav/files/admin/Docs/
+3. Для ONLYOFFICE Document Server сформируйте прямой URL документа:
+     публичная ссылка:  http://cloud/index.php/s/<ТОКЕН>/download
+     webdav:            http://admin:ПАРОЛЬ@cloud/remote.php/dav/files/admin/Docs/файл.docx
+   (имя `cloud` резолвится из контейнера Document Server по compose-сети)
+4. Вставьте URL в админ-панели пульта: «СЕРВЕРЫ → ONLYOFFICE → URL документа».
 
-В админ-панели «Серверы → ONLYOFFICE → URL документа» указывайте адрес,
-доступный ИМЕННО ИЗ КОНТЕЙНЕРА Document Server:
-  http://docs/protokol-doprosa.docx   (сервисы compose видят друг друга по имени)
+Локальные файлы в этой папке можно использовать как исходники для загрузки.
