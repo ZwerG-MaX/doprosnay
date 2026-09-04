@@ -9,9 +9,12 @@ import {
 } from "react";
 import {
   DEFAULT_CONFIG,
+  DEFAULT_TEMPLATES,
   DEFAULT_USERS,
   LS_KEYS,
   ROOMS,
+  docLsKey,
+  renderTemplate,
   type RoomDef,
   type ServerConfig,
   type UserRec,
@@ -59,6 +62,12 @@ interface StoreValue {
   saveConfig: (c: ServerConfig) => void;
   patchUser: (id: string, patch: Partial<UserRec>) => boolean;
   resetAll: () => void;
+  templates: Record<string, string>;
+  templateTick: number;
+  getTemplate: (roomId: string) => string;
+  saveTemplate: (roomId: string, text: string) => void;
+  resetTemplate: (roomId: string) => void;
+  applyTemplateToDoc: (roomId: string) => void;
 }
 
 const Ctx = createContext<StoreValue | null>(null);
@@ -75,11 +84,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     load<string | null>(LS_KEYS.session, null),
   );
   const [roomId, setRoomIdState] = useState<string>(() => load(LS_KEYS.room, ROOMS[0].id));
+  const [templates, setTemplates] = useState<Record<string, string>>(() => {
+    const l = load<Record<string, string> | null>(LS_KEYS.templates, null);
+    return { ...DEFAULT_TEMPLATES, ...(l ?? {}) };
+  });
+  const [templateTick, setTemplateTick] = useState(0);
 
   useEffect(() => save(LS_KEYS.config, config), [config]);
   useEffect(() => save(LS_KEYS.users, users), [users]);
   useEffect(() => save(LS_KEYS.session, sessionId), [sessionId]);
   useEffect(() => save(LS_KEYS.room, roomId), [roomId]);
+  useEffect(() => save(LS_KEYS.templates, templates), [templates]);
 
   const me = useMemo(() => users.find((u) => u.id === sessionId) ?? null, [users, sessionId]);
 
@@ -136,8 +151,44 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     Object.values(LS_KEYS).forEach((k) => localStorage.removeItem(k));
     setConfig(DEFAULT_CONFIG);
     setUsers(DEFAULT_USERS);
+    setTemplates(DEFAULT_TEMPLATES);
     setRoomIdState(ROOMS[0].id);
   }, []);
+
+  /* ── шаблоны протоколов (по комнатам) ── */
+  const getTemplate = useCallback(
+    (id: string) => templates[id] ?? DEFAULT_TEMPLATES[id] ?? "",
+    [templates],
+  );
+
+  const saveTemplate = useCallback((id: string, text: string) => {
+    const r = ROOMS.find((x) => x.id === id);
+    setTemplates((prev) => ({ ...prev, [id]: text }));
+    log.info("TEMPLATE", `Шаблон протокола сохранён для комнаты ${r ? r.code : id}`, `${text.length} симв.`);
+  }, []);
+
+  const resetTemplate = useCallback((id: string) => {
+    const r = ROOMS.find((x) => x.id === id);
+    setTemplates((prev) => ({ ...prev, [id]: DEFAULT_TEMPLATES[id] ?? "" }));
+    log.info("TEMPLATE", `Шаблон комнаты ${r ? r.code : id} сброшен к стандартному`);
+  }, []);
+
+  /** Применяет шаблон (с подстановкой переменных) как содержимое документа комнаты. */
+  const applyTemplateToDoc = useCallback(
+    (id: string) => {
+      const r = ROOMS.find((x) => x.id === id);
+      if (!r) return;
+      const rendered = renderTemplate(templates[id] ?? DEFAULT_TEMPLATES[id] ?? "", r);
+      try {
+        localStorage.setItem(docLsKey(id), rendered);
+      } catch {
+        /* ignore */
+      }
+      setTemplateTick((t) => t + 1);
+      log.info("TEMPLATE", `Шаблон применён к документу комнаты ${r.code}`, "документ перезаписан");
+    },
+    [templates],
+  );
 
   const value: StoreValue = {
     config,
@@ -152,6 +203,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     saveConfig,
     patchUser,
     resetAll,
+    templates,
+    templateTick,
+    getTemplate,
+    saveTemplate,
+    resetTemplate,
+    applyTemplateToDoc,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

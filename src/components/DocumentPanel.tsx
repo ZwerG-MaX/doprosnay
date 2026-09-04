@@ -1,16 +1,17 @@
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { PHRASES, type EventType, type Observer } from "../lib/data";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { PHRASES, docLsKey, renderTemplate, type EventType, type Observer } from "../lib/data";
 import { useStore } from "../lib/store";
 import { log } from "../lib/logger";
 import { fmtClock, randInt } from "../lib/hooks";
 import {
   loadDocsApi,
   buildEditorConfig,
-  downloadDocument,
   type DocsEditorInstance,
 } from "../lib/onlyoffice";
+import { buildProtocolDocx, docxFilename } from "../lib/docxgen";
+import { downloadBlob, getTemplateFile } from "../lib/filedb";
 import { Panel } from "./Panel";
-import { IcSignal, IcSave, IcFile, IcPen, IcEye } from "./Icons";
+import { IcSignal, IcSave, IcFile, IcPen, IcEye, IcTemplate } from "./Icons";
 
 const SEED_DOC = `ПРОТОКОЛ СОВМЕСТНОГО НАБЛЮДЕНИЯ
 Дело № 2026/0417 · документ комнаты открыт для совместного редактирования через ONLYOFFICE Docs.
@@ -19,8 +20,6 @@ const SEED_DOC = `ПРОТОКОЛ СОВМЕСТНОГО НАБЛЮДЕНИЯ
 
 [Н-2 · 14:02:47] Фигурант спокоен, отвечает односложно.
 [Н-4 · 14:05:12] Отмечаю: избегает зрительного контакта со следователем.`;
-
-const docLsKey = (roomId: string) => `rt-dopros.doc.${roomId}`;
 
 type ConnMode = "offline" | "connecting" | "online";
 
@@ -41,9 +40,15 @@ interface Props {
 let editId = 1;
 
 export function DocumentPanel({ observers, onEvent, onToast }: Props) {
-  const { config, room, me } = useStore();
+  const { config, room, me, getTemplate, templateTick } = useStore();
   const oo = config.onlyoffice;
   const canEdit = !!me && (me.isAdmin || me.edit.includes(room.id));
+
+  /* стартовое содержимое — шаблон комнаты (с подстановкой переменных) */
+  const seedDoc = useMemo(() => {
+    const tpl = getTemplate(room.id);
+    return tpl.trim() ? renderTemplate(tpl, room) : SEED_DOC;
+  }, [getTemplate, room]);
 
   const [mode, setMode] = useState<ConnMode>("offline");
   const [docTitle, setDocTitle] = useState(room.docTitle);
@@ -51,9 +56,9 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
   /* ---- содержимое документа (встроенный режим) ---- */
   const [text, setText] = useState<string>(() => {
     try {
-      return localStorage.getItem(docLsKey(room.id)) ?? SEED_DOC;
+      return localStorage.getItem(docLsKey(room.id)) ?? seedDoc;
     } catch {
-      return SEED_DOC;
+      return seedDoc;
     }
   });
   const [saveState, setSaveState] = useState<"saved" | "saving">("saved");
@@ -61,6 +66,19 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
   const [typingObs, setTypingObs] = useState<number | null>(null);
   const [ribbon, setRibbon] = useState<RemoteEdit | null>(null);
   const [ribbonFade, setRibbonFade] = useState(false);
+  const [tplOpen, setTplOpen] = useState(false);
+  const [tplFileName, setTplFileName] = useState<string | null>(null);
+
+  /* имя загруженного docx-шаблона комнаты (для чипа) */
+  useEffect(() => {
+    let alive = true;
+    getTemplateFile(room.id)
+      .then((f) => alive && setTplFileName(f ? f.name : null))
+      .catch(() => alive && setTplFileName(null));
+    return () => {
+      alive = false;
+    };
+  }, [room.id, templateTick]);
 
   const taRef = useRef<HTMLTextAreaElement>(null);
   const placeholderRef = useRef<HTMLDivElement>(null);
@@ -74,16 +92,33 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
   const observersRef = useRef(observers);
   observersRef.current = observers;
 
-  /* смена комнаты — другой документ */
+  /* смена комнаты — другой документ (новый создаётся из шаблона комнаты) */
   useEffect(() => {
     setDocTitle(room.docTitle);
     try {
-      setText(localStorage.getItem(docLsKey(room.id)) ?? SEED_DOC);
+      setText(localStorage.getItem(docLsKey(room.id)) ?? seedDoc);
     } catch {
-      setText(SEED_DOC);
+      setText(seedDoc);
     }
     setSavedAt(fmtClock(new Date()));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room.id]);
+
+  /* шаблон применили из админ-панели — перечитать документ комнаты */
+  useEffect(() => {
+    if (templateTick === 0) return;
+    try {
+      const v = localStorage.getItem(docLsKey(room.id));
+      if (v !== null) {
+        setText(v);
+        setSaveState("saved");
+        setSavedAt(fmtClock(new Date()));
+      }
+    } catch {
+      /* ignore */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templateTick]);
 
   /* ---- автосохранение ---- */
   const persist = (val: string) => {
@@ -103,6 +138,59 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
   const onChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
     persist(e.target.value);
+  };
+
+  /* ---- действия с шаблоном комнаты ---- */
+  const insertTemplateAtCursor = () => {
+    setTplOpen(false);
+    if (mode === "online") {
+      onToast("Вставка шаблона доступна во встроенном режиме");
+      return;
+    }
+    const el = taRef.current;
+    const start = el?.selectionStart ?? text.length;
+    const end = el?.selectionEnd ?? text.length;
+    const next = text.slice(0, start) + seedDoc + text.slice(end);
+    setText(next);
+    persist(next);
+    onToast("Шаблон вставлен в позицию курсора");
+  };
+
+  const replaceWithTemplate = () => {
+    setTplOpen(false);
+    if (mode === "online") {
+      onToast("Замена по шаблону доступна во встроенном режиме");
+      return;
+    }
+    setText(seedDoc);
+    persist(seedDoc);
+    onEvent("doc", `Документ перезаписан по шаблону комнаты ${room.code}`);
+    onToast(`Документ заменён шаблоном «${room.code}»`);
+  };
+
+  /* ---- выгрузка протокола как полноценного .docx ---- */
+  const [exporting, setExporting] = useState(false);
+  const exportDocx = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const blob = await buildProtocolDocx({
+        title: docTitle.trim() || `Протокол наблюдения · ${room.code}`,
+        roomCode: room.code,
+        roomName: room.name,
+        content: textRef.current,
+        authors: observers.map((o) => `${o.tag} ${o.name}`),
+      });
+      const name = docxFilename(docTitle.trim() || `protokol_${room.code}`);
+      downloadBlob(blob, name);
+      onToast(`Протокол выгружен: ${name}`);
+      onEvent("doc", `Документ выгружен как .docx: ${name}`);
+    } catch (err) {
+      log.error("DOCX", "Ошибка формирования протокола .docx", err instanceof Error ? err.message : String(err));
+      onToast("Не удалось сформировать .docx");
+    } finally {
+      setExporting(false);
+    }
   };
 
   /* ---- подключение ONLYOFFICE Docs по конфигурации серверов ---- */
@@ -235,17 +323,49 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
             <IcSignal className="h-3 w-3" />
             {ooOff ? "ОТКЛЮЧЁН" : mode === "online" ? "DOCS" : mode === "connecting" ? "ПОДКЛ…" : "ОФЛАЙН"}
           </span>
+          {canEdit && (
+            <span className="relative">
+              <button
+                onClick={() => setTplOpen((v) => !v)}
+                className={`flex h-7 items-center gap-1.5 rounded-md border px-2.5 font-display text-[9.5px] tracking-[0.16em] transition-all active:scale-95 ${
+                  tplOpen
+                    ? "border-live/70 bg-live/15 text-live"
+                    : "border-line bg-panel2 text-dim hover:border-live/50 hover:text-live"
+                }`}
+                title="Шаблон протокола этой комнаты"
+              >
+                <IcTemplate className="h-3.5 w-3.5" />
+                ШАБЛОН
+              </button>
+              {tplOpen && (
+                <>
+                  <span className="fixed inset-0 z-40" onClick={() => setTplOpen(false)} />
+                  <span className="absolute right-0 top-full z-50 mt-1.5 flex w-56 flex-col overflow-hidden rounded-md border border-line2 bg-panel2 shadow-2xl">
+                    <button
+                      onClick={insertTemplateAtCursor}
+                      className="px-3 py-2 text-left font-mono text-[10.5px] text-dim transition-all hover:bg-live/10 hover:text-live"
+                    >
+                      Вставить в позицию курсора
+                    </button>
+                    <button
+                      onClick={replaceWithTemplate}
+                      className="border-t border-line px-3 py-2 text-left font-mono text-[10.5px] text-dim transition-all hover:bg-amber/10 hover:text-amber"
+                    >
+                      Заменить документ шаблоном
+                    </button>
+                  </span>
+                </>
+              )}
+            </span>
+          )}
           <button
-            onClick={() => {
-              const name = downloadDocument(docTitle, textRef.current);
-              onToast(`Файл сформирован: ${name}`);
-              onEvent("doc", `Документ выгружен: ${name}`);
-            }}
-            className="rt-grad-bg flex h-7 items-center gap-1.5 rounded-md px-2.5 font-display text-[9.5px] tracking-[0.16em] text-white transition-all hover:brightness-110 active:scale-95"
-            title="Скачать документ"
+            onClick={exportDocx}
+            disabled={exporting}
+            className="rt-grad-bg flex h-7 items-center gap-1.5 rounded-md px-2.5 font-display text-[9.5px] tracking-[0.16em] text-white transition-all hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:saturate-50"
+            title="Скачать протокол как документ .docx"
           >
             <IcSave className="h-3.5 w-3.5" />
-            PDF
+            {exporting ? "…" : "DOCX"}
           </button>
         </span>
       }
@@ -264,6 +384,15 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
           onChange={(e) => setDocTitle(e.target.value)}
           className="h-7 min-w-[160px] flex-1 rounded-md border border-transparent bg-transparent px-2 font-mono text-[11.5px] text-fg outline-none transition-all hover:border-line focus:border-hud/60 focus:bg-panel2"
         />
+        {tplFileName && (
+          <span
+            className="flex items-center gap-1.5 rounded-full border border-violet/50 bg-violet/10 px-2 py-0.5 font-mono text-[9px] tracking-wider text-violet"
+            title={`Документ создан на основе docx-шаблона: ${tplFileName}`}
+          >
+            <IcFile className="h-3 w-3" />
+            <span className="max-w-[120px] truncate">{tplFileName}</span>
+          </span>
+        )}
         <span
           className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[9px] tracking-wider ${
             canEdit ? "border-live/50 bg-live/10 text-live" : "border-line bg-panel2 text-faint"

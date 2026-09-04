@@ -155,6 +155,19 @@ export const IcChevR = ({ className }: IconProps) => (
   </svg>
 );
 
+export const IcTemplate = ({ className }: IconProps) => (
+  <svg viewBox="0 0 24 24" className={className} {...S}>
+    <rect x="4" y="4" width="16" height="16" rx="1.5" />
+    <path d="M4 9h16M9 9v11M12.5 13h4M12.5 16.5h4" />
+  </svg>
+);
+
+export const IcRefresh = ({ className }: IconProps) => (
+  <svg viewBox="0 0 24 24" className={className} {...S}>
+    <path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4" />
+  </svg>
+);
+
 export const IcPdf = ({ className }: IconProps) => (
   <svg viewBox="0 0 24 24" className={className} {...S}>
     <path d="M6 3h9l4 4v14H6V3Z" />
