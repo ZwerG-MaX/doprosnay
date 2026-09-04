@@ -24,8 +24,8 @@ export function StatusBar({ sessionStart, onOpenServers, onOpenAccess, onOpenTem
         <RtMark className="h-7 w-7 shrink-0" />
         <div className="min-w-0 leading-tight">
           <div className="font-display text-[12px] uppercase tracking-[0.14em] text-fg">
-            <span className="rt-grad-text">Ростелеком</span>{" "}
-            <span className="hidden text-dim sm:inline">· видеонаблюдение</span>
+            <span className="rt-grad-text">СКИТ</span>{" "}
+            <span className="hidden text-dim sm:inline">· Допросная</span>
           </div>
           <div className="truncate font-mono text-[9px] tracking-wider text-faint">
             {room.code} · {room.name.toUpperCase()} · СИЗО-1

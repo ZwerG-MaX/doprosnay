@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────
-#  Пульт наблюдения «Допросная №2» · Ростелеком Видеонаблюдение
+#  Пульт наблюдения «Допросная №2» · СКИТ
 #  Двухступенчатая сборка: Vite-build → nginx
 # ─────────────────────────────────────────────────────────────
 
@@ -8,20 +8,33 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# vite/tailwind/typescript лежат в devDependencies — гарантируем их установку
-ENV NODE_ENV=development
+# vite/tailwind/typescript находятся в devDependencies —
+# принудительно остаёмся в dev-режиме и показываем предупреждения npm
+ENV NODE_ENV=development \
+    npm_config_audit=false \
+    npm_config_fund=false \
+    npm_config_loglevel=warn
 
 # сначала зависимости — слой будет переиспользоваться, пока package.json не менялся
 COPY package.json package-lock.json* ./
-RUN npm ci --include=dev --no-audit --no-fund --loglevel=error \
-    || npm install --include=dev --no-audit --no-fund --loglevel=error
+RUN npm ci --include=dev || npm install --include=dev
 
-# контроль: если vite не установился — падаем сразу здесь, а не на шаге сборки
-RUN node_modules/.bin/vite --version
+# Страховка: если сборочного инструментария не оказалось в package.json
+# (например, devDependencies не попали в копию проекта), ставим его явно
+RUN if [ ! -x node_modules/.bin/vite ]; then \
+      echo ">> vite не найден после установки — ставлю инструментарий явно"; \
+      npm install --no-save --include=dev \
+        vite@6.4.3 \
+        @vitejs/plugin-react@4.3.4 \
+        typescript@5.7.3 \
+        tailwindcss@4.1.7 \
+        @tailwindcss/vite@4.1.7; \
+    fi; \
+    node_modules/.bin/vite --version
 
-# затем исходники и сборка
-COPY index.html tsconfig.json vite.config.js ./
-COPY src ./src
+# исходники (копируем всё, лишнее отсекает .dockerignore)
+COPY . .
+
 RUN npm run build
 
 # ---- ступень 2: раздача статики ----

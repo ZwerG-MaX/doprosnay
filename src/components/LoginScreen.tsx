@@ -38,10 +38,10 @@ export function LoginScreen() {
           <RtMark className="h-12 w-12" />
           <div>
             <div className="font-display text-[22px] font-extrabold uppercase leading-none tracking-[0.08em] text-fg">
-              Ростелеком
+              СКИТ
             </div>
             <div className="mt-1.5 font-mono text-[10px] tracking-[0.3em] text-dim">
-              ВИДЕОНАБЛЮДЕНИЕ · СИЗО-1
+              ДОПРОСНАЯ · СИЗО-1
             </div>
           </div>
         </div>
@@ -105,7 +105,7 @@ export function LoginScreen() {
         <div className="rise w-full max-w-[520px]">
           <div className="mb-5 flex items-center gap-3 lg:hidden">
             <RtMark className="h-9 w-9" />
-            <span className="font-display text-lg font-extrabold uppercase tracking-wide">Ростелеком</span>
+            <span className="font-display text-lg font-extrabold uppercase tracking-wide">СКИТ</span>
           </div>
 
           <h1 className="font-display text-[24px] font-extrabold uppercase leading-tight tracking-wide text-fg">
