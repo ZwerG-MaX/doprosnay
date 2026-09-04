@@ -90,12 +90,42 @@ services:
     container_name: rt-mumble
     environment:
       MUMBLE_SUPERUSER_PASSWORD: "rt-mumble-2026"
-      MUMBLE_CONFIG_WELCOMETEXT: "Пульт наблюдения · Допросная · Ростелеком"
+      MUMBLE_CONFIG_WELCOMETEXT: "Пульт наблюдения · Допросная · СКИТ"
     ports:
       - "64738:64738/tcp"
       - "64738:64738/udp"
     volumes:
       - mumble_data:/data
+    restart: unless-stopped
+
+  # ── Аудиоконсоль в браузере: mumble-web + WebSocket/WebRTC-прокси ──
+  # mumble-web — HTML5-клиент (nginx образа отдаёт приложение и проксирует
+  #   /proxy → mumble-web-proxy:1337, поэтому имя сервиса ниже ОБЯЗАТЕЛЬНО
+  #   должно быть mumble-web-proxy).
+  # mumble-web-proxy — мост Mumble ⇄ WebSocket (TCP-контрол) + WebRTC (UDP-звук).
+  #   UDP 64737 пробрасывается на хост: браузер шлёт медиа напрямую.
+  #   Если UDP недоступен, mumble-web автоматически работает по WebSocket.
+  mumble-web-proxy:
+    build:
+      context: ./infra
+      dockerfile: mumble-web-proxy.Dockerfile
+    container_name: rt-mumble-proxy
+    depends_on:
+      - mumble
+    ports:
+      - "64737:64737/udp"
+    restart: unless-stopped
+
+  mumble-web:
+    image: leoverto/mumble-web:latest
+    container_name: rt-mumble-web
+    depends_on:
+      - mumble-web-proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mumble.rule=Host(`mumble.local`)"
+      - "traefik.http.routers.mumble.entrypoints=web"
+      - "traefik.http.services.mumble.loadbalancer.server.port=80"
     restart: unless-stopped
 
   # ── MediaMTX: мост «VMS (RTSP) → WebRTC/HLS» для браузера ──

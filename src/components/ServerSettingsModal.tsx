@@ -314,6 +314,23 @@ export function ServerSettingsModal({ onClose, onToast, onEvent }: Props) {
                 />
               </Field>
             </div>
+            <div className="mt-2">
+              <Field label="ВЕБ-КЛИЕНТ · АУДИОКОНСОЛЬ MUMBLE-WEB (URL)">
+                <input
+                  className={inp}
+                  value={form.mumble.webUrl}
+                  onChange={(e) => {
+                    setMu({ webUrl: e.target.value });
+                    touchMu();
+                  }}
+                  placeholder="http://mumble.local"
+                />
+              </Field>
+              <p className="mt-1 font-mono text-[9px] leading-relaxed text-faint">
+                реальный звук в браузере через mumble-web + WebSocket-прокси (см. docker-compose,
+                сервисы mumble-web / mumble-web-proxy). пусто — только пульт-эмуляция.
+              </p>
+            </div>
             <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
               <DiagButton diag={diagMu} onCheck={checkMumble} disabled={!form.mumble.enabled} />
               <span className="truncate font-mono text-[10px] text-faint">

@@ -16,8 +16,9 @@ Web-пульт для комнаты наблюдения при допросн�
  браузер ──►     │  pult.local   →  frontend  (nginx, сборка из Dockerfile)           │
                  │  docs.local   →  docs      (ONLYOFFICE Document Server)            │
                  │  cloud.local  →  cloud     (Nextcloud, SQLite — хранилище)         │
+                 │  mumble.local →  mumble-web (HTML5-аудиоклиент) ⇄ mumble-web-proxy │
                  └────────────────────────────────────────────────────────────────────┘
-   Mumble  ──►  mumble  :64738 (tcp/udp)
+   Mumble  ──►  mumble  :64738 (tcp/udp)  ·  WebRTC-медиа: udp :64737 (mumble-web-proxy)
    Видео   ──►  vms-demo (демо-VMS, RTSP) ─► media (MediaMTX) ─► браузер
                   :9554-9556 RTSP        :8554 RTSP · :8888 HLS/API · :8889/:8890 WebRTC
 ```
@@ -48,7 +49,7 @@ npm run dev          # http://localhost:5173
 1. Пропишите домены (для разработки):
    ```
    # /etc/hosts
-   127.0.0.1  pult.local docs.local cloud.local
+   127.0.0.1  pult.local docs.local cloud.local mumble.local
    ```
 2. Поднимите стек:
    ```bash
@@ -58,6 +59,7 @@ npm run dev          # http://localhost:5173
    - **http://pult.local** — пульт (или http://localhost)
    - **http://docs.local** — ONLYOFFICE Document Server (`/healthcheck` → `true`)
    - **http://cloud.local** — Nextcloud (админ: `admin` / `rt-cloud-2026`)
+   - **http://mumble.local** — аудиоконсоль mumble-web (или кнопка «АУДИОКОНСОЛЬ» в пульте)
    - **http://localhost:8080** — дашборд Traefik (только dev)
 
 Остановить: `docker compose down` (данные на томах сохраняются).
@@ -107,11 +109,57 @@ Nextcloud поднят в минимальной конфигурации: вс�
 
 ## Mumble и MACROSCOP: мосты для браузера
 
-- **Mumble.** Murmur поднимается сразу (`64738`, пароль суперпользователя
-  `rt-mumble-2026`). Для звука в браузере нужен мост
-  [mumble-web](https://github.com/Rantanen/mumble-web) + WebSocket-прокси.
-  Точка замены — `src/lib/usePtt.ts` (вместо эмуляции PTT подключается
-  `MumbleConnector`).
+- **Mumble — реальный звук уже работает через аудиоконсоль.** Стек:
+  `Murmur (:64738) ⇄ mumble-web-proxy (WebSocket/WebRTC) ⇄ mumble-web (HTML5-клиент)`,
+  всё в docker-compose и за Traefik на домене `mumble.local`. В пульте:
+  панель «АУДИОКАНАЛ» → кнопка **«АУДИОКОНСОЛЬ»** — открывается реальный клиент
+  mumble-web с автоподключением под ником наблюдателя (транслитерируется в ASCII,
+  т.к. Murmur не принимает кириллицу по умолчанию) в канал комнаты.
+  Адрес клиента редактируется в «Серверы → Mumble → Веб-клиент». Тангенту
+  (Push-to-talk) включите внутри mumble-web: Settings → Audio → Push-to-talk,
+  либо оставьте Voice activity. UDP `64737` проброшен на хост для WebRTC-медиа;
+  если он недоступен, клиент автоматически работает по WebSocket.
+  Создать каналы «Допросная №2» и т.п. нужно один раз (любым Mumble-клиентом
+  под суперпользователем, пароль `rt-mumble-2026` — в логах Murmur).
+
+  **Полная интеграция (своя тангента управляет реальным звуком).** Если нужно,
+  чтобы PTT-кнопка пульта сама открывала/закрывала передачу, вместо эмуляции в
+  `src/lib/usePtt.ts` подключается `MumbleConnector` (пакет `mumble-client`).
+  Порядок действий:
+
+  1. `npm i mumble-client mumble-connect` и полифилы Node-модулей для Vite:
+     `npm i -D vite-plugin-node-polyfills`, затем в `vite.config.js`:
+     ```js
+     import { nodePolyfills } from "vite-plugin-node-polyfills";
+     export default defineConfig({
+       plugins: [react(), tailwindcss(), nodePolyfills()],
+     });
+     ```
+  2. Коннектор (новый `src/lib/mumbleClient.ts`):
+     ```ts
+     import { WebConnector } from "mumble-connect";
+     const connector = new WebConnector(); // WebSocket ⇄ mumble-web-proxy
+     const client = await connector.connect("wss://mumble.local/proxy", 443, {
+       username, password, tokens: [],
+     });
+     client.on("connect", () => { /* клиент.self — локальный пользователь */ });
+     client.self.setSelfMute(true); // старт: микрофон закрыт
+     ```
+  3. PTT = снятие/установка self-mute (серверного PTT в Mumble нет, это делает клиент):
+     ```ts
+     const press = () => client.self.setSelfMute(false);  // передача
+     const release = () => client.self.setSelfMute(true); // тишина
+     ```
+  4. В `usePtt.ts` замените эмуляцию (`tx`, таймер, WebAudio-сигнал) на вызовы
+     `press/release`, а список участников в `CommPanel` стройте из
+     `client.channels` / событий `newUser` / `userDisconnected` вместо
+     симуляции.
+  5. Прокси для коннектора — тот же `mumble-web-proxy` из compose
+     (`wss://mumble.local/proxy`), т.е. отдельный сервер не нужен.
+
+  Пока пакеты `mumble-client` не установлены, сборка не затрагивается: пульт
+  использует аудиоконсоль (mumble-web) для реального звука и собственную
+  эмуляцию для интерфейса.
 - **MACROSCOP.** VMS отдаёт RTSP, браузер его не играет. Связка:
   `VMS (RTSP) → MediaMTX → WebRTC → <video>`. По умолчанию источником служит
   демо-VMS (`vms-demo`, тестовые таблицы с таймкодом); для реального MACROSCOP
