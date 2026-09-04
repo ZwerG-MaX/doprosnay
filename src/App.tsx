@@ -8,6 +8,7 @@ import { Ticker } from "./components/Ticker";
 import { LoginScreen } from "./components/LoginScreen";
 import { ServerSettingsModal } from "./components/ServerSettingsModal";
 import { AccessManager } from "./components/AccessManager";
+import { LogViewer } from "./components/LogViewer";
 import { IcShield } from "./components/Icons";
 import { StoreProvider, mumbleUrlOf, useStore } from "./lib/store";
 import {
@@ -30,6 +31,7 @@ function Shell() {
   const [connected, setConnected] = useState<Observer[]>([]);
   const [serversOpen, setServersOpen] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
+  const [logsOpen, setLogsOpen] = useState(false);
 
   const sessionStart = useRef(Date.now());
   const scheduled = useRef<Set<string>>(new Set());
@@ -169,6 +171,7 @@ function Shell() {
         sessionStart={sessionStart.current}
         onOpenServers={() => setServersOpen(true)}
         onOpenAccess={() => setAccessOpen(true)}
+        onOpenLogs={() => setLogsOpen(true)}
         onLogout={logout}
       />
 
@@ -204,6 +207,7 @@ function Shell() {
         />
       )}
       {accessOpen && <AccessManager onClose={() => setAccessOpen(false)} onToast={pushToast} />}
+      {logsOpen && <LogViewer onClose={() => setLogsOpen(false)} onToast={pushToast} />}
 
       {/* уведомления */}
       <div className="pointer-events-none fixed bottom-12 right-4 z-[110] flex flex-col gap-2">

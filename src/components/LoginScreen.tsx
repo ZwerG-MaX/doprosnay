@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { ROOMS } from "../lib/data";
 import { useStore } from "../lib/store";
-import { RtMark, IcShield, IcCam, IcRadio, IcFile, IcSignal } from "./Icons";
+import { RtMark, IcShield, IcCam, IcRadio, IcFile } from "./Icons";
 
 const SOURCES = [
   { icon: IcCam, label: "MACROSCOP · видеостена", note: "3 потока / комната", tone: "text-hud" },
@@ -67,21 +66,31 @@ export function LoginScreen() {
           ))}
         </div>
 
-        {/* мини-стена камер */}
-        <div className="relative mx-10 mt-8 grid flex-1 grid-cols-3 gap-2.5">
-          {ROOMS[1].cameras.map((c, i) => (
-            <div key={c.id} className="relative min-h-[90px] overflow-hidden rounded-lg border border-line">
-              <img src={c.src} alt="" className={`absolute inset-0 h-full w-full object-cover ${c.kb}`} />
-              <div className="scanlines absolute inset-0" />
-              <div className="absolute left-1.5 top-1.5 flex items-center gap-1 rounded-sm bg-black/50 px-1.5 py-0.5">
-                <span className="led blink-rec h-1.5 w-1.5 bg-rec" style={{ animationDelay: `${i * 0.3}s` }} />
-                <span className="font-mono text-[8.5px] tracking-widest text-fg">{c.num}</span>
+        {/* сводка систем */}
+        <div className="relative mx-10 mt-8 flex-1">
+          <div className="grid h-full grid-rows-3 gap-2.5">
+            {SOURCES.map((s, i) => (
+              <div
+                key={`tile-${s.label}`}
+                className="rise flex items-center gap-4 overflow-hidden rounded-lg border border-line bg-panel2/50 px-5"
+                style={{ animationDelay: `${400 + i * 130}ms` }}
+              >
+                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-md border border-line bg-panel ${s.tone}`}>
+                  <s.icon className="h-5 w-5" />
+                </span>
+                <div className="min-w-0">
+                  <div className="truncate font-display text-[11px] tracking-[0.16em] text-fg">
+                    {s.label.split("·")[1]?.trim() ?? s.label}
+                  </div>
+                  <div className="truncate font-mono text-[9.5px] tracking-wider text-faint">{s.note}</div>
+                </div>
+                <span className="ml-auto flex shrink-0 items-center gap-1.5 font-mono text-[9px] tracking-widest text-live">
+                  <span className="led bg-live shadow-[0_0_7px_rgba(49,217,138,0.9)]" />
+                  ОНЛАЙН
+                </span>
               </div>
-              <span className="absolute bottom-1.5 right-1.5 flex items-center gap-1 font-mono text-[8px] tracking-wider text-live">
-                <IcSignal className="h-2.5 w-2.5" /> LIVE
-              </span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         <div className="relative flex items-center justify-between px-10 py-6 font-mono text-[9.5px] tracking-wider text-faint">

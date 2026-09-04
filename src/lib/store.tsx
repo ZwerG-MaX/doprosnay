@@ -16,6 +16,7 @@ import {
   type ServerConfig,
   type UserRec,
 } from "./data";
+import { log } from "./logger";
 
 function load<T>(key: string, fallback: T): T {
   try {
@@ -107,7 +108,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const setRoomId = useCallback((id: string) => setRoomIdState(id), []);
 
-  const saveConfig = useCallback((c: ServerConfig) => setConfig(c), []);
+  const saveConfig = useCallback((c: ServerConfig) => {
+    log.info(
+      "CONFIG",
+      "Конфигурация серверов сохранена",
+      `MACROSCOP=${c.macroscop.host}:${c.macroscop.port}(${c.macroscop.enabled ? "вкл" : "выкл"}) · Mumble=${c.mumble.host}:${c.mumble.port}(${c.mumble.enabled ? "вкл" : "выкл"}) · ONLYOFFICE=${c.onlyoffice.dsUrl}(${c.onlyoffice.enabled ? "вкл" : "выкл"})`,
+    );
+    setConfig(c);
+  }, []);
 
   const patchUser = useCallback(
     (id: string, patch: Partial<UserRec>): boolean => {

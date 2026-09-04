@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { PHRASES, type EventType, type Observer } from "../lib/data";
 import { useStore } from "../lib/store";
+import { log } from "../lib/logger";
 import { fmtClock, randInt } from "../lib/hooks";
 import {
   loadDocsApi,
@@ -107,15 +108,18 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
   /* ---- подключение ONLYOFFICE Docs по конфигурации серверов ---- */
   useEffect(() => {
     if (!oo.enabled) {
+      log.info("ONLYOFFICE", "Сервер отключён администратором — подключение не выполняется");
       setMode("offline");
       return;
     }
     let alive = true;
     setMode("connecting");
+    log.info("ONLYOFFICE", "Инициируем подключение к Document Server", oo.dsUrl);
     onEvent("doc", `ONLYOFFICE: подключение к ${oo.dsUrl} …`);
     loadDocsApi(oo.dsUrl.trim())
       .then(() => {
         if (!alive || !ooMountRef.current) return;
+        log.info("ONLYOFFICE", "Формируем конфигурацию редактора", `mode=${canEdit ? "edit" : "view"}, doc=${room.docTitle}.docx`);
         const cfg = buildEditorConfig({
           title: `${room.docTitle}.docx`,
           docKey: room.docKey,
@@ -124,21 +128,34 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
           user: me ? { id: me.id, name: me.name } : { id: "anon", name: "Наблюдатель" },
           token: oo.jwt || undefined,
           events: {
-            onDocumentStateChange: (e: { data: boolean }) =>
-              setSaveState(e.data ? "saving" : "saved"),
+            onAppReady: () => log.info("ONLYOFFICE", "Событие onAppReady — редактор готов к работе"),
+            onDocumentStateChange: (e: { data: boolean }) => {
+              setSaveState(e.data ? "saving" : "saved");
+              log.debug("ONLYOFFICE", `Состояние документа: ${e.data ? "есть несохранённые изменения" : "сохранено"}`);
+            },
+            onError: (e: { data?: { errorCode?: number; errorDescription?: string } }) => {
+              log.error("ONLYOFFICE", "Событие onError от редактора", JSON.stringify(e.data ?? {}));
+            },
+            onInfo: (e: { data?: Record<string, unknown> }) => {
+              log.debug("ONLYOFFICE", "Событие onInfo", JSON.stringify(e.data ?? {}));
+            },
           },
         });
-        if (!window.DocsAPI) throw new Error("DocsAPI недоступен");
+        if (!window.DocsAPI) throw new Error("DocsAPI недоступен после загрузки api.js");
+        log.info("ONLYOFFICE", "Монтируем DocEditor в контейнер #oo-editor-placeholder");
         editorRef.current?.destroyEditor?.();
         editorRef.current = new window.DocsAPI.DocEditor("oo-editor-placeholder", cfg);
         setMode("online");
+        log.info("ONLYOFFICE", "Редактор ONLYOFFICE подключён и смонтирован");
         onEvent("doc", `ONLYOFFICE Docs: редактор подключён (${canEdit ? "редактирование" : "только чтение"})`);
         onToast("Редактор ONLYOFFICE подключён");
       })
       .catch((e: unknown) => {
         if (!alive) return;
         setMode("offline");
-        onEvent("sys", `ONLYOFFICE: сервер не отвечает (${e instanceof Error ? e.message : "ошибка"})`);
+        const msg = e instanceof Error ? e.message : String(e);
+        log.error("ONLYOFFICE", "Подключение к Document Server не удалось", msg);
+        onEvent("sys", `ONLYOFFICE: сервер не отвечает (${msg})`);
       });
     return () => {
       alive = false;
