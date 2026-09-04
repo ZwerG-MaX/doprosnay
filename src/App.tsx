@@ -5,23 +5,36 @@ import { CommPanel } from "./components/CommPanel";
 import { DocumentPanel } from "./components/DocumentPanel";
 import { CollaborationFeed } from "./components/CollaborationFeed";
 import { Ticker } from "./components/Ticker";
-import { OBSERVERS, MUMBLE_URL, type EventItem, type EventType, type Observer } from "./lib/data";
+import { LoginScreen } from "./components/LoginScreen";
+import { ServerSettingsModal } from "./components/ServerSettingsModal";
+import { AccessManager } from "./components/AccessManager";
+import { IcShield } from "./components/Icons";
+import { StoreProvider, mumbleUrlOf, useStore } from "./lib/store";
+import {
+  type EventItem,
+  type EventType,
+  type Observer,
+  type UserRec,
+} from "./lib/data";
 import { fmtClock, useInterval } from "./lib/hooks";
 import { usePtt } from "./lib/usePtt";
 
 let nextId = 1;
 
-export default function App() {
+function Shell() {
+  const { config, users, me, room, myRooms, logout, setRoomId } = useStore();
+
   const [events, setEvents] = useState<EventItem[]>([]);
   const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
-  /* наблюдатели подключаются по мере поступления — список динамический */
-  const [connected, setConnected] = useState<Observer[]>(() => [OBSERVERS[0]]);
-  /* аудиоканал Mumble + единая тангента (панель и видеоокно) */
   const [mumbleOnline, setMumbleOnline] = useState(false);
+  const [connected, setConnected] = useState<Observer[]>([]);
+  const [serversOpen, setServersOpen] = useState(false);
+  const [accessOpen, setAccessOpen] = useState(false);
+
   const sessionStart = useRef(Date.now());
-  const connectedRef = useRef(connected);
+  const scheduled = useRef<Set<string>>(new Set());
+  const connectedRef = useRef<Observer[]>(connected);
   connectedRef.current = connected;
-  const scheduled = useRef<Set<number>>(new Set([OBSERVERS[0].n]));
 
   const addEvent = useCallback((type: EventType, text: string) => {
     setEvents((prev) =>
@@ -35,75 +48,128 @@ export default function App() {
     window.setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3400);
   }, []);
 
-  /* единая тангента: панель Mumble и полноэкранное видеоокно */
   const ptt = usePtt(mumbleOnline, addEvent);
+
+  /* пользователь → участник канала */
+  const toObs = useCallback(
+    (u: UserRec): Observer => {
+      const n = users.indexOf(u) + 1;
+      return { n, tag: `Н-${n}`, name: u.name, role: u.title, color: u.color, muted: !!u.muted };
+    },
+    [users],
+  );
 
   /* подключение к серверу Mumble */
   useEffect(() => {
     const t = window.setTimeout(() => {
       setMumbleOnline(true);
-      addEvent("audio", `Mumble: подключено к ${MUMBLE_URL} · Opus 128 кбит/с`);
+      addEvent("audio", `Mumble: подключено к ${mumbleUrlOf(config)} · Opus 128 кбит/с`);
     }, 1200);
     return () => window.clearTimeout(t);
-  }, [addEvent]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  /* подключение / отключение наблюдателей */
-  const join = useCallback(
-    (o: Observer) => {
-      setConnected((prev) => (prev.some((p) => p.n === o.n) ? prev : [...prev, o]));
-      addEvent("audio", `${o.tag} (${o.name}) подключился к каналу «Наблюдатели»`);
-    },
-    [addEvent],
-  );
+  /* при входе / смене комнаты — пересобираем канал наблюдателей */
+  useEffect(() => {
+    if (!me) return;
+    scheduled.current = new Set([me.id]);
+    setConnected([toObs(me)]);
+    addEvent("audio", `Вы вошли в канал «${room.mumbleChannel}» (${room.name})`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.id, room.id]);
 
-  const leave = useCallback(
-    (o: Observer) => {
-      setConnected((prev) => prev.filter((p) => p.n !== o.n));
-      addEvent("audio", `${o.tag} (${o.name}) покинул канал`);
+  /* участники подключаются постепенно — только из состава активной комнаты */
+  const candidatesLeft = me
+    ? users.filter((u) => u.id !== me.id && (u.isAdmin || u.view.includes(room.id)))
+    : [];
+  const allIn = candidatesLeft.every((u) => scheduled.current.has(u.id));
+
+  useInterval(
+    () => {
+      const next = candidatesLeft.find((u) => !scheduled.current.has(u.id));
+      if (!next) return;
+      scheduled.current.add(next.id);
+      const obs = toObs(next);
+      setConnected((prev) => (prev.some((p) => p.n === obs.n) ? prev : [...prev, obs]));
+      addEvent("audio", `${obs.tag} (${obs.name}) подключился к каналу «${room.mumbleChannel}»`);
     },
-    [addEvent],
+    allIn || !me ? null : 3200,
   );
 
   const joinNext = useCallback(() => {
-    const next = OBSERVERS.find((o) => !connectedRef.current.some((p) => p.n === o.n));
-    if (next) join(next);
-  }, [join]);
+    const next = candidatesLeft.find((u) => !scheduled.current.has(u.id));
+    if (!next) return;
+    scheduled.current.add(next.id);
+    const obs = toObs(next);
+    setConnected((prev) => (prev.some((p) => p.n === obs.n) ? prev : [...prev, obs]));
+    addEvent("audio", `${obs.tag} (${obs.name}) подключён вручную`);
+  }, [candidatesLeft, toObs, addEvent]);
 
-  /* стартовая последовательность подключения систем */
+  const leaveObs = useCallback(
+    (o: Observer) => {
+      setConnected((prev) => prev.filter((p) => p.n !== o.n));
+      const u = users.find((x) => x.name === o.name);
+      if (u) scheduled.current.add(u.id);
+      addEvent("audio", `${o.tag} (${o.name}) покинул канал`);
+    },
+    [users, addEvent],
+  );
+
+  /* стартовая последовательность */
   const booted = useRef(false);
   useEffect(() => {
-    if (booted.current) return;
+    if (booted.current || !me) return;
     booted.current = true;
     const seq: Array<[number, EventType, string]> = [
-      [250, "sys", "Пульт наблюдения: инициализация · смена Б, пост 7"],
-      [800, "video", "MACROSCOP: соединение с VMS-2 установлено (ГОСТ TLS)"],
-      [1300, "video", "Потоки CAM 01 / CAM 02 / CAM 03 активны · 25 к/с · H.265"],
-      [1800, "sys", "Сервер аудиоканала: рукопожатие Mumble (UDP 64738)"],
-      [2300, "audio", "Н-1 (майор Соколов, вы) подключился к каналу"],
+      [250, "sys", `Пульт: вход в систему — ${me.name} (${me.isAdmin ? "администратор" : "оператор"})`],
+      [800, "video", `MACROSCOP: соединение с ${config.macroscop.host} установлено`],
+      [1300, "video", "Потоки камер активны · 25 к/с · H.265"],
+      [1800, "sys", "Сервер аудиоканала: рукопожатие Mumble (UDP)"],
+      [2300, "doc", "ONLYOFFICE Docs: конфигурация загружена"],
     ];
     seq.forEach(([d, t, s]) => window.setTimeout(() => addEvent(t, s), d));
-  }, [addEvent]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me]);
 
-  /* остальные наблюдатели подключаются постепенно */
-  const allIn = connected.length >= OBSERVERS.length;
-  useInterval(
-    () => {
-      const next = OBSERVERS.find((o) => !scheduled.current.has(o.n));
-      if (!next) return;
-      scheduled.current.add(next.n);
-      if (!connectedRef.current.some((p) => p.n === next.n)) join(next);
-    },
-    allIn ? null : 3400,
-  );
+  /* ── экран входа ── */
+  if (!me) {
+    return <LoginScreen />;
+  }
+
+  /* ── нет прав ни на одну комнату ── */
+  if (myRooms.length === 0) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <div className="rise max-w-md rounded-xl border border-line bg-panel/80 p-8 text-center">
+          <IcShield className="mx-auto h-10 w-10 text-faint" />
+          <h1 className="mt-4 font-display text-[15px] tracking-[0.14em] text-fg">ДОСТУП НЕ НАЗНАЧЕН</h1>
+          <p className="mt-2 text-[13px] leading-relaxed text-dim">
+            Администратор ещё не распределил вас по комнатам. Обратитесь к старшему смены.
+          </p>
+          <button
+            onClick={logout}
+            className="mt-5 h-10 rounded-lg border border-line bg-panel2 px-5 font-mono text-[11px] tracking-widest text-dim transition-all hover:border-line2 hover:text-fg active:scale-95"
+          >
+            СМЕНИТЬ УЧЁТНУЮ ЗАПИСЬ
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen flex-col text-fg lg:h-screen lg:overflow-hidden">
-      <StatusBar sessionStart={sessionStart.current} />
+      <StatusBar
+        sessionStart={sessionStart.current}
+        onOpenServers={() => setServersOpen(true)}
+        onOpenAccess={() => setAccessOpen(true)}
+        onLogout={logout}
+      />
 
       <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 p-3 lg:grid-cols-2">
         {/* левая половина: документ ONLYOFFICE + активность */}
         <section className="flex min-h-0 flex-col gap-3">
-          <DocumentPanel observers={connected} onEvent={addEvent} onToast={pushToast} />
+          <DocumentPanel observers={connected.filter((o) => o.name !== me.name)} onEvent={addEvent} onToast={pushToast} />
           <CollaborationFeed events={events} />
         </section>
 
@@ -115,13 +181,23 @@ export default function App() {
             online={mumbleOnline}
             ptt={ptt}
             onJoin={joinNext}
-            onLeave={leave}
+            onLeave={leaveObs}
             onEvent={addEvent}
           />
         </section>
       </main>
 
       <Ticker />
+
+      {/* админ-модалки */}
+      {serversOpen && (
+        <ServerSettingsModal
+          onClose={() => setServersOpen(false)}
+          onToast={pushToast}
+          onEvent={(t, s) => addEvent(t, s)}
+        />
+      )}
+      {accessOpen && <AccessManager onClose={() => setAccessOpen(false)} onToast={pushToast} />}
 
       {/* уведомления */}
       <div className="pointer-events-none fixed bottom-12 right-4 z-[110] flex flex-col gap-2">
@@ -136,5 +212,13 @@ export default function App() {
         ))}
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <StoreProvider>
+      <Shell />
+    </StoreProvider>
   );
 }

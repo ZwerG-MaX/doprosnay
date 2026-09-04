@@ -1,29 +1,37 @@
 import { useState } from "react";
 import { useInterval, randInt } from "../lib/hooks";
-import { CAMERAS, MUMBLE_URL, VMS_HOST } from "../lib/data";
+import { useStore, mumbleUrlOf } from "../lib/store";
 
-function genStats(): string[] {
+function genStats(hosts: { vms: string; mumble: string; docs: string; cams: number }): string[] {
   return [
-    ...CAMERAS.map((c) => `${c.num} ${(randInt(3600, 4800) / 1000).toFixed(2)} Мбит/с`),
+    ...Array.from({ length: hosts.cams }, (_, i) => `CAM 0${i + 1} ${(randInt(3600, 4800) / 1000).toFixed(2)} Мбит/с`),
     `потери пакетов ${(Math.random() * 0.6).toFixed(2)}%`,
     `Mumble ${randInt(17, 42)} мс`,
     `CPU ${randInt(21, 46)}%`,
     `архив: запись ${randInt(9, 16)} МБ/с`,
     `хранилище 214,6 ГБ из 4 ТБ`,
-    VMS_HOST,
-    MUMBLE_URL,
+    hosts.vms,
+    hosts.mumble,
+    hosts.docs,
   ];
 }
 
 export function Ticker() {
-  const [stats, setStats] = useState<string[]>(() => genStats());
-  useInterval(() => setStats(genStats()), 2400);
+  const { config, room } = useStore();
+  const hosts = {
+    vms: config.macroscop.host,
+    mumble: mumbleUrlOf(config),
+    docs: config.onlyoffice.dsUrl,
+    cams: room.cameras.length,
+  };
+  const [stats, setStats] = useState<string[]>(() => genStats(hosts));
+  useInterval(() => setStats(genStats(hosts)), 2400);
   const line = stats.join("   ··   ");
 
   return (
     <footer className="flex h-8 shrink-0 items-stretch overflow-hidden border-t border-line bg-panel/95">
       <span className="flex shrink-0 items-center gap-2 border-r border-line bg-panel2 px-3 font-display text-[9.5px] tracking-[0.24em] text-amber">
-        <span className="led bg-amber shadow-[0_0_7px_rgba(255,180,58,0.9)]" />
+        <span className="led bg-amber shadow-[0_0_7px_rgba(255,138,61,0.9)]" />
         ТЕЛЕМЕТРИЯ
       </span>
       <div className="relative flex-1 overflow-hidden">

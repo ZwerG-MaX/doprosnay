@@ -1,27 +1,25 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { OBSERVERS, PHRASES, type EventType, type Observer } from "../lib/data";
+import { PHRASES, type EventType, type Observer } from "../lib/data";
+import { useStore } from "../lib/store";
 import { fmtClock, randInt } from "../lib/hooks";
 import {
   loadDocsApi,
   buildEditorConfig,
-  makeDocKey,
   downloadDocument,
   type DocsEditorInstance,
 } from "../lib/onlyoffice";
 import { Panel } from "./Panel";
-import { ConnectModal, loadSettings, saveSettings, type OOSettings } from "./ConnectModal";
-import { IcSignal, IcSave, IcFile } from "./Icons";
+import { IcSignal, IcSave, IcFile, IcPen, IcEye } from "./Icons";
 
 const SEED_DOC = `ПРОТОКОЛ СОВМЕСТНОГО НАБЛЮДЕНИЯ
-Допросная № 2 · дело № 2026/0417
-Документ открыт для совместного редактирования через ONLYOFFICE Docs.
+Дело № 2026/0417 · документ комнаты открыт для совместного редактирования через ONLYOFFICE Docs.
 
 ── ЗАПИСИ СОАВТОРОВ ───────────────────────────────
 
 [Н-2 · 14:02:47] Фигурант спокоен, отвечает односложно.
 [Н-4 · 14:05:12] Отмечаю: избегает зрительного контакта со следователем.`;
 
-const DOC_LS_KEY = "doprosnaya2-oo-document-v1";
+const docLsKey = (roomId: string) => `rt-dopros.doc.${roomId}`;
 
 type ConnMode = "offline" | "connecting" | "online";
 
@@ -42,21 +40,20 @@ interface Props {
 let editId = 1;
 
 export function DocumentPanel({ observers, onEvent, onToast }: Props) {
-  const settings = loadSettings();
-  const [mode, setMode] = useState<ConnMode>("offline");
-  const [connError, setConnError] = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [docTitle, setDocTitle] = useState(settings.title);
+  const { config, room, me } = useStore();
+  const oo = config.onlyoffice;
+  const canEdit = !!me && (me.isAdmin || me.edit.includes(room.id));
 
-  /* ---- содержимое документа (офлайн-режим) ---- */
+  const [mode, setMode] = useState<ConnMode>("offline");
+  const [docTitle, setDocTitle] = useState(room.docTitle);
+
+  /* ---- содержимое документа (встроенный режим) ---- */
   const [text, setText] = useState<string>(() => {
     try {
-      const saved = localStorage.getItem(DOC_LS_KEY);
-      if (saved !== null && saved.length > 0) return saved;
+      return localStorage.getItem(docLsKey(room.id)) ?? SEED_DOC;
     } catch {
-      /* ignore */
+      return SEED_DOC;
     }
-    return SEED_DOC;
   });
   const [saveState, setSaveState] = useState<"saved" | "saving">("saved");
   const [savedAt, setSavedAt] = useState<string>(() => fmtClock(new Date()));
@@ -66,6 +63,7 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
 
   const taRef = useRef<HTMLTextAreaElement>(null);
   const placeholderRef = useRef<HTMLDivElement>(null);
+  const ooMountRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<DocsEditorInstance | null>(null);
   const textRef = useRef(text);
   textRef.current = text;
@@ -75,13 +73,24 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
   const observersRef = useRef(observers);
   observersRef.current = observers;
 
+  /* смена комнаты — другой документ */
+  useEffect(() => {
+    setDocTitle(room.docTitle);
+    try {
+      setText(localStorage.getItem(docLsKey(room.id)) ?? SEED_DOC);
+    } catch {
+      setText(SEED_DOC);
+    }
+    setSavedAt(fmtClock(new Date()));
+  }, [room.id]);
+
   /* ---- автосохранение ---- */
   const persist = (val: string) => {
     setSaveState("saving");
     window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
       try {
-        localStorage.setItem(DOC_LS_KEY, val);
+        localStorage.setItem(docLsKey(room.id), val);
       } catch {
         /* ignore */
       }
@@ -95,111 +104,56 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
     persist(e.target.value);
   };
 
-  /* ---- автоподключение при наличии сохранённого сервера ---- */
-  const bootRef = useRef(false);
+  /* ---- подключение ONLYOFFICE Docs по конфигурации серверов ---- */
   useEffect(() => {
-    if (bootRef.current) return;
-    bootRef.current = true;
-    if (settings.server.trim()) {
-      void connectToServer(settings);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const connectToServer = async (s: OOSettings) => {
+    let alive = true;
     setMode("connecting");
-    setConnError(null);
-    onEvent("sys", `ONLYOFFICE: подключение к ${s.server} …`);
-    try {
-      await loadDocsApi(s.server.trim());
-      setMode("online");
-      setDocTitle(s.title || "Документ.docx");
-      onEvent("doc", `ONLYOFFICE Docs: редактор подключён (${s.server})`);
-      onToast("Редактор ONLYOFFICE подключён");
-    } catch (e) {
-      setMode("offline");
-      const msg = e instanceof Error ? e.message : "Сервер недоступен";
-      setConnError(msg);
-      onEvent("sys", `ONLYOFFICE: нет связи с сервером — офлайн-режим`);
-    }
-  };
-
-  const goOffline = () => {
-    setMode("offline");
-    setConnError(null);
-    setShowModal(false);
-    onEvent("sys", "ONLYOFFICE: офлайн-режим совместного редактирования");
-  };
-
-  /* ---- монтирование реального редактора DocsAPI ---- */
-  useEffect(() => {
-    if (mode !== "online" || !window.DocsAPI || !placeholderRef.current) return;
-    const s = loadSettings();
-    const cfg = buildEditorConfig({
-      title: s.title || "Документ.docx",
-      docKey: makeDocKey(s.title || "document"),
-      docUrl: s.docUrl || "",
-      user: { id: "observer-1", name: OBSERVERS[0].name },
-      callbackUrl: s.server ? `${s.server.replace(/\/+$/, "")}/callback` : undefined,
-      token: s.jwt || undefined,
-      events: {
-        onAppReady: () => onEvent("doc", "ONLYOFFICE: редактор готов к работе"),
-        onDocumentStateChange: (e) => {
-          if (e.data) setSaveState("saving");
-          else {
-            setSaveState("saved");
-            setSavedAt(fmtClock(new Date()));
-          }
-        },
-        onError: (e) => {
-          setConnError(e.data?.errorDescription || "Ошибка редактора");
-          onEvent("sys", `ONLYOFFICE: ошибка редактора (код ${e.data?.errorCode ?? "?"})`);
-        },
-      },
-    });
-    try {
-      editorRef.current = new window.DocsAPI.DocEditor("oo-placeholder", cfg);
-    } catch (e) {
-      setMode("offline");
-      setConnError(e instanceof Error ? e.message : "Не удалось инициализировать редактор");
-    }
+    onEvent("doc", `ONLYOFFICE: подключение к ${oo.dsUrl} …`);
+    loadDocsApi(oo.dsUrl.trim())
+      .then(() => {
+        if (!alive || !ooMountRef.current) return;
+        const cfg = buildEditorConfig({
+          title: `${room.docTitle}.docx`,
+          docKey: room.docKey,
+          docUrl: oo.docUrl,
+          mode: canEdit ? "edit" : "view",
+          user: me ? { id: me.id, name: me.name } : { id: "anon", name: "Наблюдатель" },
+          token: oo.jwt || undefined,
+          events: {
+            onDocumentStateChange: (e: { data: boolean }) =>
+              setSaveState(e.data ? "saving" : "saved"),
+          },
+        });
+        if (!window.DocsAPI) throw new Error("DocsAPI недоступен");
+        editorRef.current?.destroyEditor?.();
+        editorRef.current = new window.DocsAPI.DocEditor("oo-editor-placeholder", cfg);
+        setMode("online");
+        onEvent("doc", `ONLYOFFICE Docs: редактор подключён (${canEdit ? "редактирование" : "только чтение"})`);
+        onToast("Редактор ONLYOFFICE подключён");
+      })
+      .catch((e: unknown) => {
+        if (!alive) return;
+        setMode("offline");
+        onEvent("sys", `ONLYOFFICE: сервер не отвечает (${e instanceof Error ? e.message : "ошибка"})`);
+      });
     return () => {
-      try {
-        editorRef.current?.destroyEditor();
-      } catch {
-        /* ignore */
-      }
+      alive = false;
+      editorRef.current?.destroyEditor?.();
       editorRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
+  }, [oo.dsUrl, oo.docUrl, oo.jwt, room.id, canEdit]);
 
-  /* ---- симуляция совместного редактирования (офлайн) ---- */
-  const appendRemote = (line: string) => {
-    const ta = taRef.current;
-    const next = textRef.current + line;
-    const sel =
-      ta && document.activeElement === ta
-        ? { s: ta.selectionStart ?? next.length, e: ta.selectionEnd ?? next.length }
-        : null;
-    setText(next);
-    persist(next);
-    if (ta && sel) {
-      requestAnimationFrame(() =>
-        ta.setSelectionRange(Math.min(sel.s, next.length), Math.min(sel.e, next.length)),
-      );
-    }
-  };
-
+  /* ---- симуляция правок соавторов (встроенный режим) ---- */
   useEffect(() => {
-    if (mode !== "offline") return;
+    if (mode === "online") return;
     let alive = true;
     let outer = 0;
     let inner = 0;
     const tick = () => {
       outer = window.setTimeout(() => {
         if (!alive) return;
-        const candidates = observersRef.current.filter((o) => o.n !== 1 && !o.muted);
+        const candidates = observersRef.current;
         if (candidates.length === 0) {
           tick();
           return;
@@ -210,157 +164,167 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
         inner = window.setTimeout(() => {
           if (!alive) return;
           setTypingObs(null);
-          appendRemote(`\n[${obs.tag} · ${fmtClock(new Date())}] ${phrase}`);
+          setText((prev) => prev + `\n[${obs.tag} · ${fmtClock(new Date())}] ${phrase}`);
+          persist(textRef.current + `\n[${obs.tag} · ${fmtClock(new Date())}] ${phrase}`);
           setRibbon({ id: editId++, tag: obs.tag, name: obs.name, color: obs.color, text: phrase });
           setRibbonFade(false);
           window.clearTimeout(ribbonTimer.current);
           ribbonTimer.current = window.setTimeout(() => setRibbonFade(true), 2600);
-          onEvent("doc", `${obs.tag} (${obs.name}): правка в документе`);
+          onEvent("doc", `${obs.tag} (${obs.name}): запись добавлена в документ`);
           tick();
-        }, randInt(1400, 2400));
-      }, randInt(8000, 14000));
+        }, randInt(1500, 2600));
+      }, randInt(9000, 15000));
     };
     tick();
     return () => {
       alive = false;
       window.clearTimeout(outer);
       window.clearTimeout(inner);
-      window.clearTimeout(ribbonTimer.current);
-      window.clearTimeout(typingTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode]);
+  }, [mode, room.id]);
 
   const words = text.trim() ? text.trim().split(/\s+/).length : 0;
-  const coAuthors = observers.filter((o) => o.n !== 1).length;
 
-  const modePill =
+  const statusPill =
     mode === "online"
-      ? "border-live/40 bg-live/10 text-live"
+      ? "border-live/60 bg-live/10 text-live"
       : mode === "connecting"
-        ? "border-amber/40 bg-amber/10 text-amber"
-        : "border-line2 bg-panel2 text-dim";
+        ? "border-amber/60 bg-amber/10 text-amber blink-rec"
+        : "border-line bg-panel2 text-dim";
 
   return (
     <Panel
-      title="ONLYOFFICE DOCS"
-      sub={mode === "online" ? "совместное редактирование · сервер" : "совместное редактирование"}
+      title="ПРОТОКОЛ · ONLYOFFICE"
+      sub={`${room.code} · ключ ${room.docKey}`}
       className="min-h-[420px] flex-1 lg:min-h-0 lg:flex-[3]"
       delay={120}
+      ledClass={
+        mode === "online"
+          ? "bg-live shadow-[0_0_8px_rgba(49,217,138,0.8)]"
+          : "bg-amber shadow-[0_0_8px_rgba(255,138,61,0.8)] blink-rec"
+      }
       right={
-        <div className="flex items-center gap-1.5">
+        <span className="flex items-center gap-1.5">
+          <span className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[9.5px] tracking-wider ${statusPill}`}>
+            <IcSignal className="h-3 w-3" />
+            {mode === "online" ? "DOCS" : mode === "connecting" ? "ПОДКЛ…" : "ОФЛАЙН"}
+          </span>
           <button
-            onClick={() => setShowModal(true)}
-            title="Настройка подключения к Document Server"
-            className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[9.5px] tracking-wider transition-all active:scale-95 ${modePill}`}
+            onClick={() => {
+              const name = downloadDocument(docTitle, textRef.current);
+              onToast(`Файл сформирован: ${name}`);
+              onEvent("doc", `Документ выгружен: ${name}`);
+            }}
+            className="rt-grad-bg flex h-7 items-center gap-1.5 rounded-md px-2.5 font-display text-[9.5px] tracking-[0.16em] text-white transition-all hover:brightness-110 active:scale-95"
+            title="Скачать документ"
           >
-            <IcSignal
-              className={`h-3 w-3 ${mode === "connecting" ? "blink-rec" : ""}`}
-            />
-            {mode === "online"
-              ? "СЕРВЕР"
-              : mode === "connecting"
-                ? "ПОДКЛЮЧЕНИЕ…"
-                : "ОФЛАЙН"}
+            <IcSave className="h-3.5 w-3.5" />
+            PDF
           </button>
-        </div>
+        </span>
       }
     >
-      {/* строка документа: название + соавторы + сохранение */}
-      <div className="flex items-center gap-2.5 border-b border-line px-3 py-2">
+      {/* строка документа: название, соавторы, права */}
+      <div className="flex flex-wrap items-center gap-2 px-3 pt-2.5">
         <IcFile className="h-4 w-4 shrink-0 text-hud" />
         <input
           value={docTitle}
           onChange={(e) => setDocTitle(e.target.value)}
-          spellCheck={false}
-          className="min-w-0 flex-1 truncate rounded-sm border border-transparent bg-transparent font-body text-[12.5px] font-medium text-fg focus:border-line2 focus:bg-ink/40 focus:outline-none"
-          title="Название документа"
+          className="h-7 min-w-[160px] flex-1 rounded-md border border-transparent bg-transparent px-2 font-mono text-[11.5px] text-fg outline-none transition-all hover:border-line focus:border-hud/60 focus:bg-panel2"
         />
-
-        {/* аватары соавторов */}
-        <div className="flex shrink-0 items-center -space-x-1.5">
+        <span
+          className={`flex items-center gap-1.5 rounded-full border px-2 py-0.5 font-mono text-[9px] tracking-wider ${
+            canEdit ? "border-live/50 bg-live/10 text-live" : "border-line bg-panel2 text-faint"
+          }`}
+          title={canEdit ? "Вам разрешено редактирование" : "Только чтение — нет прав на редактирование"}
+        >
+          {canEdit ? <IcPen className="h-3 w-3" /> : <IcEye className="h-3 w-3" />}
+          {canEdit ? "РЕДАКТИРОВАНИЕ" : "ТОЛЬКО ЧТЕНИЕ"}
+        </span>
+        <div className="flex items-center -space-x-1.5">
+          {me && (
+            <span
+              title={`${me.name} (вы)`}
+              className="grid h-6 w-6 place-items-center rounded-full border-2 border-panel font-display text-[8.5px] font-bold text-ink"
+              style={{ background: me.color }}
+            >
+              {me.name.slice(0, 2).toUpperCase()}
+            </span>
+          )}
           {observers.map((o) => (
             <span
               key={o.n}
-              title={`${o.name} · ${o.role}${typingObs === o.n ? " · печатает…" : ""}`}
-              className={`relative grid h-6 w-6 place-items-center rounded-full border-2 border-panel font-mono text-[9px] font-bold text-ink transition-transform hover:z-10 hover:scale-110 ${
+              title={`${o.name} · ${o.role}`}
+              className={`grid h-6 w-6 place-items-center rounded-full border-2 border-panel font-display text-[8.5px] font-bold text-ink ${
                 typingObs === o.n ? "typing-ring" : ""
               }`}
               style={{ background: o.color }}
             >
-              {o.n}
-              {typingObs === o.n && (
-                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-sm bg-amber px-1 font-mono text-[7px] leading-tight text-ink">
-                  …
-                </span>
-              )}
+              {o.name.replace(/^(майор|капитан|ст\. л-т)\s+/i, "").slice(0, 2).toUpperCase()}
             </span>
           ))}
+          <span className="pl-3 font-mono text-[9.5px] text-faint">{observers.length + 1} в сети</span>
         </div>
-        <span className="hidden shrink-0 font-mono text-[9.5px] text-faint sm:block">
-          {coAuthors} соавт.
-        </span>
-
-        <button
-          onClick={() => {
-            const name = downloadDocument(docTitle, text);
-            onToast(`Документ сохранён: ${name}`);
-            onEvent("doc", `Документ выгружен: ${name}`);
-          }}
-          title="Скачать документ"
-          className="flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-line bg-panel2 px-2.5 font-mono text-[9.5px] tracking-widest text-dim transition-all hover:border-hud/60 hover:text-hud active:scale-95"
-        >
-          <IcSave className="h-3.5 w-3.5" />
-          <span className="hidden md:inline">СКАЧАТЬ</span>
-        </button>
       </div>
 
-      {/* лента последней правки соавтора */}
-      {mode === "offline" && ribbon && (
-        <div
-          className={`mx-3 mt-2 flex items-start gap-2 rounded-md border border-line bg-panel2/70 px-2.5 py-1.5 transition-opacity duration-700 ${
-            ribbonFade ? "opacity-35" : "opacity-100"
-          }`}
-        >
-          <span
-            className="mt-0.5 h-2 w-2 shrink-0 rounded-full"
-            style={{ background: ribbon.color }}
-          />
-          <p className="min-w-0 font-mono text-[10px] leading-snug text-dim">
-            <span className="font-semibold" style={{ color: ribbon.color }}>
-              {ribbon.tag} {ribbon.name}
-            </span>{" "}
-            добавил(а): {ribbon.text}
-          </p>
-        </div>
-      )}
-
-      {/* область редактирования */}
-      <div className="min-h-0 flex-1 p-3">
-        {mode === "online" ? (
-          <div ref={placeholderRef} id="oo-placeholder" className="h-full w-full overflow-hidden rounded-md" />
-        ) : (
-          <textarea
-            ref={taRef}
-            value={text}
-            onChange={onChange}
-            spellCheck={false}
-            placeholder="Начните вводить текст документа…"
-            className="paper h-full min-h-[180px] w-full resize-none rounded-md border border-line2 px-3 pl-[54px] font-body text-[12.5px] leading-[30px] shadow-[inset_0_2px_10px_rgba(10,20,35,0.08)] transition-shadow focus:outline-none focus:ring-1 focus:ring-hud/60"
-          />
+      {/* лента правки соавтора */}
+      <div className="relative px-3 pt-2">
+        {ribbon && (
+          <div
+            className={`rise flex items-center gap-2 rounded-md border border-line bg-panel2 px-2.5 py-1.5 text-[11px] transition-opacity duration-500 ${
+              ribbonFade ? "opacity-0" : "opacity-100"
+            }`}
+            style={{ borderLeft: `3px solid ${ribbon.color}` }}
+          >
+            <span className="font-mono text-[10px] font-semibold" style={{ color: ribbon.color }}>
+              {ribbon.tag}
+            </span>
+            <span className="truncate text-dim">{ribbon.name} добавил(а): «{ribbon.text}»</span>
+          </div>
         )}
       </div>
 
-      {/* строка состояния */}
+      {/* редактор */}
+      <div className="min-h-0 flex-1 px-3 py-2.5">
+        {mode === "online" ? (
+          <div ref={ooMountRef} className="h-full min-h-[260px] overflow-hidden rounded-md border border-line2 bg-white">
+            <div id="oo-editor-placeholder" ref={placeholderRef} className="h-full w-full" />
+          </div>
+        ) : (
+          <div className="relative h-full">
+            {mode === "connecting" && (
+              <div className="absolute inset-x-0 top-0 z-10 flex items-center gap-2 rounded-t-md bg-amber/10 px-3 py-1.5 font-mono text-[10px] tracking-wider text-amber">
+                <span className="led blink-rec bg-amber" />
+                подключение к Document Server…
+              </div>
+            )}
+            <textarea
+              ref={taRef}
+              value={text}
+              onChange={onChange}
+              readOnly={!canEdit}
+              spellCheck={false}
+              placeholder={canEdit ? "Введите запись протокола…" : "Документ доступен только для чтения"}
+              className={`paper h-full min-h-[200px] w-full resize-none rounded-md border border-line2 px-3 pl-[54px] text-[12.5px] font-body leading-[30px] shadow-[inset_0_2px_10px_rgba(10,20,35,0.08)] transition-shadow focus:outline-none focus:ring-1 focus:ring-hud/60 ${
+                !canEdit ? "cursor-default opacity-90" : ""
+              }`}
+            />
+            {mode === "offline" && (
+              <div className="absolute bottom-2 left-[62px] font-mono text-[9px] tracking-wider text-faint/80">
+                локальный режим: ONLYOFFICE-сервер не отвечает — совместные правки эмулируются
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* нижняя строка */}
       <footer className="flex h-9 shrink-0 items-center gap-4 border-t border-line px-3 font-mono text-[10px] text-faint">
         <span className="tabular-nums">{text.length} симв.</span>
         <span className="tabular-nums">{words} слов</span>
-        {connError && mode === "offline" && (
-          <span className="hidden truncate text-rec/80 lg:inline" title={connError}>
-            {connError}
-          </span>
-        )}
         <span className="ml-auto flex items-center gap-1.5">
+          <IcSave className="h-3.5 w-3.5" />
           {saveState === "saving" ? (
             <span className="text-amber">сохранение…</span>
           ) : (
@@ -370,19 +334,6 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
           )}
         </span>
       </footer>
-
-      {showModal && (
-        <ConnectModal
-          initial={loadSettings()}
-          onClose={() => setShowModal(false)}
-          onConnect={(s) => {
-            saveSettings(s);
-            setShowModal(false);
-            void connectToServer(s);
-          }}
-          onOffline={goOffline}
-        />
-      )}
     </Panel>
   );
 }

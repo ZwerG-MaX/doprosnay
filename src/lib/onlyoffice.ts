@@ -93,11 +93,17 @@ export function loadDocsApi(server: string): Promise<void> {
   return pending;
 }
 
+/** Быстрая проверка доступности Document Server (загрузка api.js + DocsAPI). */
+export async function checkOnlyOfficeServer(server: string): Promise<void> {
+  await loadDocsApi(server);
+}
+
 export function buildEditorConfig(opts: {
   title: string;
   docKey: string;
   docUrl: string;
   user: OOUser;
+  mode?: "edit" | "view";
   callbackUrl?: string;
   token?: string;
   events?: OOEditorConfig["events"];
@@ -113,7 +119,7 @@ export function buildEditorConfig(opts: {
     editorConfig: {
       callbackUrl: opts.callbackUrl,
       lang: "ru",
-      mode: "edit",
+      mode: opts.mode ?? "edit",
       user: opts.user,
       customization: {
         autosave: true,

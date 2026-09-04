@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { OBSERVERS, MUMBLE_URL, type EventType, type Observer } from "../lib/data";
+import { type EventType, type Observer } from "../lib/data";
+import { useStore, mumbleUrlOf } from "../lib/store";
 import { useInterval, randInt } from "../lib/hooks";
 import type { PttApi } from "../lib/usePtt";
 import { Panel } from "./Panel";
@@ -26,6 +27,11 @@ interface Props {
 }
 
 export function CommPanel({ connected, online, ptt, onJoin, onLeave, onEvent }: Props) {
+  const { config, room, users } = useStore();
+  const mumbleUrl = mumbleUrlOf(config);
+  /* вместимость канала = все, у кого есть доступ к активной комнате */
+  const roomCap = users.filter((u) => u.isAdmin || u.view.includes(room.id)).length;
+
   const [latency, setLatency] = useState(24);
   const [bars, setBars] = useState<number[]>(() => Array.from({ length: 14 }, () => 6));
   const [speakingId, setSpeakingId] = useState<number | null>(null);
@@ -99,7 +105,7 @@ export function CommPanel({ connected, online, ptt, onJoin, onLeave, onEvent }: 
   return (
     <Panel
       title="АУДИОКАНАЛ · MUMBLE"
-      sub={MUMBLE_URL}
+      sub={`${mumbleUrl} · канал «${room.mumbleChannel}»`}
       delay={90}
       className="min-h-0 lg:max-h-[420px]"
       ledClass={
@@ -118,7 +124,7 @@ export function CommPanel({ connected, online, ptt, onJoin, onLeave, onEvent }: 
         <div>
           <div className={channelHead}>
             <IcChevR className="h-3 w-3" />
-            ДОПРОСНАЯ №2 · ГРОМКАЯ СВЯЗЬ
+            {room.mumbleChannel.toUpperCase()} · ГРОМКАЯ СВЯЗЬ
           </div>
           <div className="mt-1 border-l-2 border-amber/50 pl-1">
             {userRow("s", "#ff8a3d", "SLD", "следователь · майор Ребров", 101)}
@@ -135,7 +141,7 @@ export function CommPanel({ connected, online, ptt, onJoin, onLeave, onEvent }: 
             </div>
             <button
               onClick={onJoin}
-              disabled={connected.length >= OBSERVERS.length}
+              disabled={connected.length >= roomCap}
               title="Подключить наблюдателя"
               className="grid h-[18px] w-[18px] place-items-center rounded-sm border border-line bg-panel2 text-dim transition-all hover:border-hud/60 hover:text-hud active:scale-90 disabled:cursor-not-allowed disabled:opacity-35"
             >

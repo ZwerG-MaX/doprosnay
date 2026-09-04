@@ -168,6 +168,74 @@ export const IcChevL = ({ className }: IconProps) => (
   </svg>
 );
 
+export const IcGear = ({ className }: IconProps) => (
+  <svg viewBox="0 0 24 24" className={className} {...S}>
+    <circle cx="12" cy="12" r="3.2" />
+    <path d="M12 2.8v2.6M12 18.6v2.6M2.8 12h2.6M18.6 12h2.6M5.5 5.5l1.9 1.9M16.6 16.6l1.9 1.9M18.5 5.5l-1.9 1.9M7.4 16.6l-1.9 1.9" />
+  </svg>
+);
+
+export const IcUsers = ({ className }: IconProps) => (
+  <svg viewBox="0 0 24 24" className={className} {...S}>
+    <circle cx="9" cy="8" r="3.2" />
+    <path d="M3.5 19.5c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5" />
+    <path d="M15.5 5.4a3.2 3.2 0 0 1 0 5.7M17.6 14.9c1.6.7 2.6 2.2 2.9 4.1" />
+  </svg>
+);
+
+export const IcLogout = ({ className }: IconProps) => (
+  <svg viewBox="0 0 24 24" className={className} {...S}>
+    <path d="M14 4H6v16h8M10 12h10M17 8.5l3.5 3.5-3.5 3.5" />
+  </svg>
+);
+
+export const IcEye = ({ className }: IconProps) => (
+  <svg viewBox="0 0 24 24" className={className} {...S}>
+    <path d="M2.5 12S6 5.8 12 5.8 21.5 12 21.5 12 18 18.2 12 18.2 2.5 12 2.5 12Z" />
+    <circle cx="12" cy="12" r="2.6" />
+  </svg>
+);
+
+export const IcPen = ({ className }: IconProps) => (
+  <svg viewBox="0 0 24 24" className={className} {...S}>
+    <path d="m14.5 5 4.5 4.5L8.5 20 3.5 20.5 4 15.5 14.5 5Z" />
+    <path d="m12.5 7 4.5 4.5" />
+  </svg>
+);
+
+export const IcShield = ({ className }: IconProps) => (
+  <svg viewBox="0 0 24 24" className={className} {...S}>
+    <path d="M12 2.5 4.5 5.3v5.6c0 4.7 3.2 8.8 7.5 10.6 4.3-1.8 7.5-5.9 7.5-10.6V5.3L12 2.5Z" />
+    <path d="m8.8 11.8 2.2 2.2 4.2-4.5" />
+  </svg>
+);
+
+/* фирменный знак «лента» (стилизация) */
+export const RtMark = ({ className }: IconProps) => (
+  <svg viewBox="0 0 48 48" className={className}>
+    <defs>
+      <linearGradient id="rtg1" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stopColor="#00b0f0" />
+        <stop offset="0.55" stopColor="#7a5cf5" />
+        <stop offset="1" stopColor="#f04e9a" />
+      </linearGradient>
+      <linearGradient id="rtg2" x1="0" y1="1" x2="1" y2="0">
+        <stop offset="0" stopColor="#ff8a3d" />
+        <stop offset="1" stopColor="#f04e9a" />
+      </linearGradient>
+    </defs>
+    <path
+      fill="url(#rtg1)"
+      d="M8 30 C8 14 18 8 30 8 L40 8 L40 16 L30 16 C22 16 16 20 16 30 L16 40 L8 40 Z"
+    />
+    <path
+      fill="url(#rtg2)"
+      d="M40 18 C40 34 30 40 18 40 L8 40 L8 32 L18 32 C26 32 32 28 32 18 L32 8 L40 8 Z"
+      opacity="0.9"
+    />
+  </svg>
+);
+
 export const IcClose = ({ className }: IconProps) => (
   <svg viewBox="0 0 24 24" className={className} {...S}>
     <path d="m6 6 12 12M18 6 6 18" />

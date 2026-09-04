@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
-import { CAMERAS, VMS_HOST, type EventType } from "../lib/data";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { type EventType, type CameraDef } from "../lib/data";
 import { useNow, useInterval, randInt } from "../lib/hooks";
+import { useStore } from "../lib/store";
 import type { PttApi } from "../lib/usePtt";
 import { Panel } from "./Panel";
 import { Feed } from "./CameraFeed";
 import { CameraModal } from "./CameraModal";
-import { IcPopout } from "./Icons";
+import { IcPopout, IcCam } from "./Icons";
 
 interface Props {
   onEvent: (t: EventType, s: string) => void;
@@ -13,19 +14,37 @@ interface Props {
   ptt: PttApi;
 }
 
-/* Видеостена: только 3 камеры. Снимки, полный экран, метаданные — во всплывающем окне. */
+/* Видеостена: камеры активной комнаты. Всё расширенное — во всплывающем окне. */
 export function CameraWall({ onEvent, onToast, ptt }: Props) {
-  const [activeId, setActiveId] = useState(CAMERAS[0].id);
+  const { config, room, myRooms, roomId, setRoomId } = useStore();
+
+  /* собираем RTSP-адреса из конфигурации MACROSCOP */
+  const cams: CameraDef[] = useMemo(
+    () =>
+      room.cameras.map((c) => ({
+        ...c,
+        rtsp: `${config.macroscop.proto}://${config.macroscop.host}:${config.macroscop.port}/macroscop/${room.code.toLowerCase()}/${c.id}`,
+      })),
+    [room, config.macroscop],
+  );
+
+  const [activeId, setActiveId] = useState(cams[0]?.id ?? "cam01");
   const [glitch, setGlitch] = useState(false);
   const [modalId, setModalId] = useState<string | null>(null);
-  const [rates, setRates] = useState<number[]>(() => CAMERAS.map(() => randInt(3800, 4600)));
+  const [rates, setRates] = useState<number[]>(() => cams.map(() => randInt(3800, 4600)));
   const glitchTimer = useRef(0);
   const now = useNow(500);
 
-  const activeIdx = Math.max(0, CAMERAS.findIndex((c) => c.id === activeId));
-  const active = CAMERAS[activeIdx];
+  /* смена комнаты — сброс на первую камеру */
+  useEffect(() => {
+    setActiveId(cams[0]?.id ?? "cam01");
+    setRates(cams.map(() => randInt(3800, 4600)));
+  }, [room.id, cams.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useInterval(() => setRates(CAMERAS.map(() => randInt(3600, 4800))), 2200);
+  const activeIdx = Math.max(0, cams.findIndex((c) => c.id === activeId));
+  const active = cams[activeIdx] ?? cams[0];
+
+  useInterval(() => setRates(cams.map(() => randInt(3600, 4800))), 2200);
 
   const switchCam = (id: string) => {
     if (id === activeId) return;
@@ -33,68 +52,98 @@ export function CameraWall({ onEvent, onToast, ptt }: Props) {
     setGlitch(true);
     window.clearTimeout(glitchTimer.current);
     glitchTimer.current = window.setTimeout(() => setGlitch(false), 420);
-    const c = CAMERAS.find((x) => x.id === id);
-    if (c) onEvent("video", `Основной монитор: ${c.num} · ${c.label}`);
+    const c = cams.find((x) => x.id === id);
+    if (c) onEvent("video", `Основной монитор переключён: ${c.num} · ${c.label} (${room.name})`);
   };
 
-  const openModal = (id: string) => {
-    setModalId(id);
-    onEvent("video", "Всплывающее окно: открыт расширенный просмотр камеры");
-  };
-
+  /* горячие клавиши 1–3 */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT" || el.isContentEditable))
-        return;
-      if (modalId) return; // в окне камеры клавиши обрабатывает само окно
-      if (e.key === "1") switchCam(CAMERAS[0].id);
-      if (e.key === "2") switchCam(CAMERAS[1].id);
-      if (e.key === "3") switchCam(CAMERAS[2].id);
+      if (el && (el.tagName === "TEXTAREA" || el.tagName === "INPUT" || el.isContentEditable)) return;
+      const i = Number(e.key) - 1;
+      if (i >= 0 && i < cams.length) switchCam(cams[i].id);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId, modalId]);
+  }, [cams, activeId]);
+
+  const openModal = (id: string) => {
+    setModalId(id);
+    const c = cams.find((x) => x.id === id);
+    if (c) onEvent("video", `Полноэкранный просмотр: ${c.num} (${room.name})`);
+  };
 
   return (
     <Panel
       title="ВИДЕОСТЕНА"
-      sub={`MACROSCOP · ${VMS_HOST} · 3 камеры`}
-      ledClass="bg-hud shadow-[0_0_8px_rgba(0,176,240,0.85)]"
+      sub={`${config.macroscop.host} · ${cams.length} потоков · MACROSCOP`}
+      ledClass="bg-hud shadow-[0_0_8px_rgba(0,176,240,0.8)]"
       className="min-h-0 flex-1"
       delay={40}
       right={
-        <>
-          <span className="hidden rounded-full border border-line bg-panel2 px-2.5 py-0.5 font-mono text-[9.5px] tracking-wider text-dim md:inline">
-            3 потока · 25 fps · H.265
-          </span>
-          <button
-            onClick={() => openModal(activeId)}
-            title="Всплывающее окно: расширенный просмотр, снимки, полный экран"
-            className="flex h-7 items-center gap-1.5 rounded-md border border-line bg-panel2 px-2 font-mono text-[9.5px] tracking-widest text-dim transition-all hover:border-hud/60 hover:text-hud active:scale-95"
-          >
-            <IcPopout className="h-3.5 w-3.5" />
-            ОКНО
-          </button>
-        </>
+        <button
+          onClick={() => openModal(active.id)}
+          className="flex h-7 items-center gap-1.5 rounded-md border border-hud/50 bg-hud/10 px-2.5 font-mono text-[9.5px] tracking-widest text-hud transition-all hover:bg-hud/20 active:scale-95"
+          title="Открыть всплывающее окно камер"
+        >
+          <IcPopout className="h-3.5 w-3.5" />
+          ОКНО
+        </button>
       }
     >
       <div className="flex min-h-0 flex-1 flex-col">
+        {/* табы комнат (доступные по правам) */}
+        {myRooms.length > 1 && (
+          <div className="flex shrink-0 gap-1.5 overflow-x-auto px-2.5 pt-2.5">
+            {myRooms.map((r) => {
+              const activeRoom = r.id === roomId;
+              return (
+                <button
+                  key={r.id}
+                  onClick={() => {
+                    if (r.id !== roomId) {
+                      setRoomId(r.id);
+                      onEvent("sys", `Переключение на комнату «${r.name}» (${r.code})`);
+                    }
+                  }}
+                  className={`flex shrink-0 items-center gap-2 rounded-md border px-2.5 py-1.5 transition-all duration-150 active:scale-[0.97] ${
+                    activeRoom
+                      ? "border-hud/70 bg-hud/12 text-fg shadow-[0_0_14px_rgba(0,176,240,0.2)]"
+                      : "border-line bg-panel2 text-dim hover:border-line2 hover:text-fg"
+                  }`}
+                >
+                  <IcCam className={`h-3.5 w-3.5 ${activeRoom ? "text-hud" : "text-faint"}`} />
+                  <span className="font-display text-[9.5px] tracking-[0.14em]">{r.code}</span>
+                  <span className="hidden max-w-[110px] truncate font-mono text-[9px] text-faint sm:block">
+                    {r.name}
+                  </span>
+                  <span className={`font-mono text-[8.5px] ${activeRoom ? "text-hud" : "text-faint"}`}>
+                    {r.cameras.length} кам
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* основной монитор */}
         <div
-          onDoubleClick={() => openModal(activeId)}
+          className="relative m-2.5 min-h-0 flex-1 cursor-pointer overflow-hidden rounded-md border border-line2"
+          onDoubleClick={() => openModal(active.id)}
           title="Двойной клик — всплывающее окно"
-          className="relative m-2.5 mb-0 aspect-video min-h-0 shrink cursor-zoom-in overflow-hidden bg-black lg:aspect-auto lg:flex-1"
         >
-          <Feed cam={active} rate={rates[activeIdx]} now={now} big glitch={glitch} idx={activeIdx} />
+          {active && (
+            <Feed cam={active} rate={rates[activeIdx]} now={now} big glitch={glitch} idx={activeIdx} />
+          )}
         </div>
 
-        {/* три камеры */}
-        <div className="grid shrink-0 grid-cols-3 gap-2 p-2.5">
-          {CAMERAS.map((c, i) => (
+        {/* камеры комнаты */}
+        <div className={`grid shrink-0 gap-2 p-2.5 pt-0 ${cams.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+          {cams.map((c, i) => (
             <button
-              key={c.id}
+              key={`${room.id}-${c.id}`}
               onClick={() => switchCam(c.id)}
               onDoubleClick={(e) => {
                 e.stopPropagation();
@@ -102,7 +151,7 @@ export function CameraWall({ onEvent, onToast, ptt }: Props) {
               }}
               className={`group relative aspect-video overflow-hidden rounded-md border text-left transition-all duration-200 ${
                 c.id === activeId
-                  ? "border-hud shadow-[0_0_16px_rgba(0,176,240,0.3)]"
+                  ? "border-hud shadow-[0_0_16px_rgba(0,176,240,0.25)]"
                   : "border-line opacity-75 hover:border-line2 hover:opacity-100"
               }`}
               title={`${c.num} · ${c.label} (клавиша ${i + 1}, 2× клик — окно)`}
@@ -125,13 +174,14 @@ export function CameraWall({ onEvent, onToast, ptt }: Props) {
         </div>
 
         <div className="hidden shrink-0 items-center justify-between px-3 pb-2 font-mono text-[9.5px] tracking-wider text-faint lg:flex">
-          <span className="truncate">{active.rtsp}</span>
-          <span className="shrink-0 pl-3">1–3 — переключение · 2× клик — всплывающее окно</span>
+          <span className="truncate">{active?.rtsp}</span>
+          <span className="shrink-0 pl-3">1–{cams.length} — переключение · 2× клик — всплывающее окно</span>
         </div>
       </div>
 
       {modalId && (
         <CameraModal
+          cameras={cams}
           camId={modalId}
           ptt={ptt}
           onSwitch={(id) => {

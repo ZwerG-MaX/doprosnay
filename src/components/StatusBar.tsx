@@ -1,31 +1,32 @@
 import { useState } from "react";
 import { useNow, useInterval, fmtClock, fmtDate, fmtDur, randInt } from "../lib/hooks";
-import { IcRt } from "./Icons";
+import { useStore, mumbleUrlOf } from "../lib/store";
+import { RtMark, IcGear, IcUsers, IcLogout, IcShield } from "./Icons";
 
-const chip =
-  "flex items-center gap-1.5 rounded-full border border-line bg-panel2/80 px-3 py-1 font-mono text-[10px] tracking-wider text-dim";
+interface Props {
+  sessionStart: number;
+  onOpenServers: () => void;
+  onOpenAccess: () => void;
+  onLogout: () => void;
+}
 
-export function StatusBar({ sessionStart }: { sessionStart: number }) {
+export function StatusBar({ sessionStart, onOpenServers, onOpenAccess, onLogout }: Props) {
   const now = useNow(1000);
+  const { config, me, room } = useStore();
   const [latency, setLatency] = useState(24);
   useInterval(() => setLatency(randInt(17, 44)), 2600);
 
   return (
-    <header className="rise relative flex h-16 shrink-0 items-center gap-3 border-b border-line bg-panel/95 px-3 md:px-4">
-      <div className="flex min-w-0 items-center gap-3">
-        <IcRt className="h-9 w-9 shrink-0" />
+    <header className="rise flex h-14 shrink-0 items-center gap-3 border-b border-line bg-panel/95 px-3 md:px-4">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <RtMark className="h-7 w-7 shrink-0" />
         <div className="min-w-0 leading-tight">
-          <div className="flex items-center gap-2.5">
-            <span className="rt-grad-text font-display text-[15px] font-bold tracking-wide">
-              РОСТЕЛЕКОМ
-            </span>
-            <span className="hidden h-4 w-px shrink-0 bg-line2 sm:block" />
-            <span className="hidden shrink-0 font-display text-[10.5px] tracking-[0.22em] text-fg sm:block">
-              ВИДЕОНАБЛЮДЕНИЕ
-            </span>
+          <div className="font-display text-[12px] uppercase tracking-[0.14em] text-fg">
+            <span className="rt-grad-text">Ростелеком</span>{" "}
+            <span className="hidden text-dim sm:inline">· видеонаблюдение</span>
           </div>
-          <div className="mt-0.5 truncate font-mono text-[9px] tracking-wider text-faint">
-            Допросная №2 · пульт наблюдения · СИЗО-1 · пост 7
+          <div className="truncate font-mono text-[9px] tracking-wider text-faint">
+            {room.code} · {room.name.toUpperCase()} · СИЗО-1
           </div>
         </div>
       </div>
@@ -35,29 +36,71 @@ export function StatusBar({ sessionStart }: { sessionStart: number }) {
           {fmtClock(now)}
         </span>
         <span className="mt-1 font-mono text-[9.5px] tracking-[0.22em] text-faint">
-          {fmtDate(now)} · СМЕНА Б · ДЕЖ. ОФИЦЕР
+          {fmtDate(now)} · СМЕНА Б · ПОСТ 7
         </span>
       </div>
 
       <div className="ml-auto flex items-center gap-1.5 md:gap-2 lg:ml-0">
-        <span className={`${chip} hidden sm:flex`}>
+        <span className="hidden items-center gap-1.5 rounded-full border border-line bg-panel2 px-2.5 py-1 font-mono text-[10px] tracking-wider text-dim xl:flex" title={config.macroscop.host}>
           <span className="led bg-live shadow-[0_0_7px_rgba(49,217,138,0.9)]" />
-          MACROSCOP·VMS2
+          MACROSCOP
         </span>
-        <span className={chip}>
+        <span className="hidden items-center gap-1.5 rounded-full border border-line bg-panel2 px-2.5 py-1 font-mono text-[10px] tracking-wider text-dim xl:flex" title={mumbleUrlOf(config)}>
           <span className="led bg-hud shadow-[0_0_7px_rgba(0,176,240,0.9)]" />
           MUMBLE·{latency}мс
         </span>
-        <span className="flex items-center gap-2 rounded-full border border-rec/40 bg-rec/10 px-3 py-1">
+        <span className="flex items-center gap-2 rounded-full border border-rec/40 bg-rec/10 px-2.5 py-1">
           <span className="led blink-rec bg-rec shadow-[0_0_8px_rgba(255,77,94,0.9)]" />
-          <span className="font-mono text-[10px] font-semibold tracking-widest text-rec">
+          <span className="font-mono text-[10px] font-semibold tracking-widest text-rec tabular-nums">
             REC {fmtDur(now.getTime() - sessionStart)}
           </span>
         </span>
-      </div>
 
-      {/* фирменная градиентная полоса РТ */}
-      <div className="rt-stripe absolute inset-x-0 bottom-0" />
+        {/* пользователь */}
+        <span className="flex items-center gap-2 rounded-full border border-line bg-panel2 py-1 pl-1 pr-2.5">
+          <span
+            className="grid h-6 w-6 place-items-center rounded-full font-display text-[9px] font-bold text-ink"
+            style={{ background: me?.color }}
+          >
+            {me?.name.replace(/^(майор|капитан|ст\. л-т)\s+/i, "").slice(0, 2).toUpperCase()}
+          </span>
+          <span className="hidden flex-col leading-none md:flex">
+            <span className="max-w-[120px] truncate text-[11px] font-semibold text-fg">{me?.name}</span>
+            <span className={`mt-0.5 flex items-center gap-1 font-mono text-[8.5px] tracking-wider ${me?.isAdmin ? "text-violet" : "text-faint"}`}>
+              {me?.isAdmin && <IcShield className="h-2.5 w-2.5" />}
+              {me?.isAdmin ? "АДМИНИСТРАТОР" : "ОПЕРАТОР"}
+            </span>
+          </span>
+        </span>
+
+        {/* админ-инструменты */}
+        {me?.isAdmin && (
+          <>
+            <button
+              onClick={onOpenServers}
+              title="Серверы подключения (MACROSCOP · Mumble · ONLYOFFICE)"
+              className="grid h-8 w-8 place-items-center rounded-full border border-line bg-panel2 text-dim transition-all hover:border-violet/60 hover:text-violet hover:shadow-[0_0_12px_rgba(122,92,245,0.25)] active:scale-90"
+            >
+              <IcGear className="h-4 w-4" />
+            </button>
+            <button
+              onClick={onOpenAccess}
+              title="Управление доступом: комнаты и права"
+              className="grid h-8 w-8 place-items-center rounded-full border border-line bg-panel2 text-dim transition-all hover:border-hud/60 hover:text-hud hover:shadow-[0_0_12px_rgba(0,176,240,0.25)] active:scale-90"
+            >
+              <IcUsers className="h-4 w-4" />
+            </button>
+          </>
+        )}
+
+        <button
+          onClick={onLogout}
+          title="Выйти из системы"
+          className="grid h-8 w-8 place-items-center rounded-full border border-line bg-panel2 text-dim transition-all hover:border-rec/60 hover:text-rec hover:shadow-[0_0_12px_rgba(255,77,94,0.25)] active:scale-90"
+        >
+          <IcLogout className="h-4 w-4" />
+        </button>
+      </div>
     </header>
   );
 }

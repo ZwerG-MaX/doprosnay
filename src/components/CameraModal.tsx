@@ -1,19 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { CAMERAS, type EventType } from "../lib/data";
+import { type CameraDef, type EventType } from "../lib/data";
 import { useNow, useInterval, fmtClock, fmtDate, randInt } from "../lib/hooks";
 import type { PttApi } from "../lib/usePtt";
 import { Feed } from "./CameraFeed";
 import { Eq } from "./CommPanel";
 import { IcSnap, IcClose, IcSignal, IcCam, IcRadio } from "./Icons";
 
-const RES: Record<string, string> = {
-  cam1: "2560×1440",
-  cam2: "1920×1080 · PTZ",
-  cam3: "2560×1440",
-};
+const RES_LIST = ["2560×1440", "1920×1080 · PTZ", "2560×1440", "1920×1080"];
 
 interface Props {
+  cameras: CameraDef[];
   camId: string;
   ptt: PttApi;
   onSwitch: (id: string) => void;
@@ -22,7 +19,8 @@ interface Props {
   onToast: (s: string) => void;
 }
 
-export function CameraModal({ camId, ptt, onSwitch, onClose, onEvent, onToast }: Props) {
+export function CameraModal({ cameras, camId, ptt, onSwitch, onClose, onEvent, onToast }: Props) {
+  const CAMERAS = cameras;
   const [glitch, setGlitch] = useState(false);
   const [flash, setFlash] = useState(false);
   const [rates, setRates] = useState<number[]>(() => CAMERAS.map(() => randInt(3700, 4700)));
@@ -92,7 +90,7 @@ export function CameraModal({ camId, ptt, onSwitch, onClose, onEvent, onToast }:
         <div className="mx-auto hidden items-center gap-2 lg:flex">
           <span className="flex items-center gap-1.5 rounded-sm border border-line bg-panel2 px-2 py-1 font-mono text-[9.5px] tracking-wider text-dim">
             <IcSignal className="h-3 w-3 text-live" />
-            {RES[cam.id] ?? "—"} · H.265
+            {RES_LIST[idx % RES_LIST.length]} · H.265
           </span>
           <span className="max-w-[300px] truncate rounded-sm border border-line bg-panel2 px-2 py-1 font-mono text-[9.5px] text-hud">
             {cam.rtsp}
