@@ -79,7 +79,7 @@ export async function buildProtocolDocx(p: DocxParams): Promise<Blob> {
   const time = now.toLocaleTimeString("ru-RU");
 
   const doc = new Document({
-    creator: "Ростелеком · Видеонаблюдение",
+    creator: "СКИТ · Допросная",
     title: p.title,
     description: `Протокол наблюдения · комната ${p.roomCode} (${p.roomName})`,
     sections: [
@@ -90,7 +90,7 @@ export async function buildProtocolDocx(p: DocxParams): Promise<Blob> {
             alignment: AlignmentType.CENTER,
             spacing: { after: 60 },
             children: [
-              new TextRun({ text: "РОСТЕЛЕКОМ · ВИДЕОНАБЛЮДЕНИЕ", bold: true, size: 18, font: FONT, color: "7A28CB" }),
+              new TextRun({ text: "СКИТ · ДОПРОСНАЯ", bold: true, size: 18, font: FONT, color: "7A28CB" }),
             ],
           }),
           new Paragraph({
@@ -150,7 +150,7 @@ export async function buildTemplateDocx(title: string, content: string): Promise
   const { AlignmentType, BorderStyle, Document, Packer, Paragraph, TextRun } = lib;
 
   const doc = new Document({
-    creator: "Ростелеком · Видеонаблюдение",
+    creator: "СКИТ · Допросная",
     title,
     sections: [
       {
