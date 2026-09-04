@@ -8,9 +8,16 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
+# vite/tailwind/typescript лежат в devDependencies — гарантируем их установку
+ENV NODE_ENV=development
+
 # сначала зависимости — слой будет переиспользоваться, пока package.json не менялся
 COPY package.json package-lock.json* ./
-RUN npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+RUN npm ci --include=dev --no-audit --no-fund --loglevel=error \
+    || npm install --include=dev --no-audit --no-fund --loglevel=error
+
+# контроль: если vite не установился — падаем сразу здесь, а не на шаге сборки
+RUN node_modules/.bin/vite --version
 
 # затем исходники и сборка
 COPY index.html tsconfig.json vite.config.js ./
