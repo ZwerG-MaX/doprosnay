@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { type EventType, type Observer } from "../lib/data";
 import { useStore, mumbleUrlOf } from "../lib/store";
 import { useInterval, randInt } from "../lib/hooks";
+import { AudioConsole } from "./AudioConsole";
 import type { PttApi } from "../lib/usePtt";
 import { Panel } from "./Panel";
 import { IcMic, IcMicOff, IcHeadOff, IcRadio, IcChevR, IcPlus, IcClose } from "./Icons";
@@ -27,12 +28,13 @@ interface Props {
 }
 
 export function CommPanel({ connected, online, ptt, onJoin, onLeave, onEvent }: Props) {
-  const { config, room, users } = useStore();
+  const { config, room, users, me } = useStore();
   const mumbleUrl = mumbleUrlOf(config);
   /* вместимость канала = все, у кого есть доступ к активной комнате */
   const roomCap = users.filter((u) => u.isAdmin || u.view.includes(room.id)).length;
 
   const [latency, setLatency] = useState(24);
+  const [consoleOpen, setConsoleOpen] = useState(false);
   const [bars, setBars] = useState<number[]>(() => Array.from({ length: 14 }, () => 6));
   const [speakingId, setSpeakingId] = useState<number | null>(null);
   const speakTimer = useRef<number>(0);
@@ -122,12 +124,27 @@ export function CommPanel({ connected, online, ptt, onJoin, onLeave, onEvent }: 
             : "bg-amber shadow-[0_0_8px_rgba(255,138,61,0.8)] blink-rec"
       }
       right={
-        <span
-          className={`rounded-full border px-2 py-0.5 font-mono text-[10px] tabular-nums ${
-            disabledByAdmin ? "border-line bg-panel text-faint" : "border-line bg-raise text-dim"
-          }`}
-        >
-          {disabledByAdmin ? "отключён" : online ? `${latency} мс` : "подключение…"}
+        <span className="flex items-center gap-1.5">
+          <span
+            className={`rounded-full border px-2 py-0.5 font-mono text-[10px] tabular-nums ${
+              disabledByAdmin ? "border-line bg-panel text-faint" : "border-line bg-raise text-dim"
+            }`}
+          >
+            {disabledByAdmin ? "отключён" : online ? `${latency} мс` : "подключение…"}
+          </span>
+          {!disabledByAdmin && config.mumble.webUrl && (
+            <button
+              onClick={() => {
+                setConsoleOpen(true);
+                onEvent("audio", `Открыта аудиоконсоль mumble-web (канал «${room.mumbleChannel}»)`);
+              }}
+              title="Реальный голосовой клиент mumble-web (звук в браузере)"
+              className="flex h-6 items-center gap-1.5 rounded-full border border-amber/50 bg-amber/10 px-2.5 font-mono text-[9.5px] tracking-wider text-amber transition-all hover:bg-amber/20 hover:shadow-[0_0_12px_rgba(255,138,61,0.3)] active:scale-95"
+            >
+              <IcRadio className="h-3 w-3" />
+              АУДИОКОНСОЛЬ
+            </button>
+          )}
         </span>
       }
     >
@@ -209,7 +226,7 @@ export function CommPanel({ connected, online, ptt, onJoin, onLeave, onEvent }: 
                 ptt.tx ? "text-white/80" : "text-dim"
               }`}
             >
-              {ptt.tx ? `в эфире ${ptt.txSec} с → «Допросная №2»` : "удерживайте кнопку или SPACE"}
+              {ptt.tx ? `в эфире ${ptt.txSec} с → «${room.mumbleChannel}»` : "удерживайте кнопку или SPACE"}
             </span>
           </button>
 
@@ -268,8 +285,24 @@ export function CommPanel({ connected, online, ptt, onJoin, onLeave, onEvent }: 
               эхо-подавление
             </span>
           </div>
+
+          {config.mumble.webUrl && (
+            <p className="mt-1.5 text-center font-mono text-[8.5px] leading-relaxed text-faint">
+              реальный звук — кнопка «АУДИОКОНСОЛЬ» (mumble-web); здесь — пульт-эмуляция
+            </p>
+          )}
         </div>
       </div>
+
+      {consoleOpen && (
+        <AudioConsole
+          baseUrl={config.mumble.webUrl}
+          username={me?.name ?? "Наблюдатель"}
+          channel={room.mumbleChannel}
+          roomLabel={`${room.code} · ${room.name}`}
+          onClose={() => setConsoleOpen(false)}
+        />
+      )}
     </Panel>
   );
 }
