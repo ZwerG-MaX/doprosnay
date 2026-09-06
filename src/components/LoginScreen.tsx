@@ -1,18 +1,95 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useStore } from "../lib/store";
-import { RtMark, IcShield, IcCam, IcRadio, IcFile } from "./Icons";
+import { probeAll } from "../lib/probe";
+import { RtMark, IcShield, IcCam, IcRadio, IcFile, IcDb, IcRefresh } from "./Icons";
 
-const SOURCES = [
-  { icon: IcCam, label: "MACROSCOP · видеостена", note: "3 потока / комната", tone: "text-hud" },
-  { icon: IcRadio, label: "Mumble · аудиоканал", note: "PTT «Допросная»", tone: "text-amber" },
-  { icon: IcFile, label: "ONLYOFFICE Docs", note: "сопротокол · RT-облако", tone: "text-live" },
-];
+type ServerKey = "macroscop" | "mumble" | "onlyoffice" | "pg";
+type St = "checking" | "online" | "offline";
+
+const strip = (u: string) => u.replace(/^https?:\/\//, "").replace(/\/+$/, "");
 
 export function LoginScreen() {
-  const { users, login } = useStore();
+  const { users, login, config } = useStore();
   const [sel, setSel] = useState<string | null>(null);
   const [pwd, setPwd] = useState("");
   const [err, setErr] = useState(false);
+
+  /* ── цели опроса четырёх серверов ── */
+  const targets = useMemo(
+    () => [
+      {
+        key: "macroscop" as ServerKey,
+        icon: IcCam,
+        tone: "text-hud",
+        glow: "rgba(0,176,240,0.28)",
+        name: "MACROSCOP",
+        sub: `видеостена · ${strip(config.macroscop.host)}`,
+        url: "http://localhost:8888/v3/paths/list",
+        cors: false,
+      },
+      {
+        key: "mumble" as ServerKey,
+        icon: IcRadio,
+        tone: "text-amber",
+        glow: "rgba(255,138,61,0.28)",
+        name: "MUMBLE",
+        sub: `аудиоканал · ${config.mumble.host}:${config.mumble.port}`,
+        url: config.mumble.webUrl,
+        cors: false,
+      },
+      {
+        key: "onlyoffice" as ServerKey,
+        icon: IcFile,
+        tone: "text-live",
+        glow: "rgba(49,217,138,0.28)",
+        name: "ONLYOFFICE",
+        sub: `документы · ${strip(config.onlyoffice.dsUrl)}`,
+        url: `${config.onlyoffice.dsUrl.replace(/\/+$/, "")}/healthcheck`,
+        cors: false,
+      },
+      {
+        key: "pg" as ServerKey,
+        icon: IcDb,
+        tone: "text-violet",
+        glow: "rgba(122,92,245,0.3)",
+        name: "POSTGRESQL",
+        sub: `данные · ${strip(config.backend.apiUrl)}`,
+        url: `${config.backend.apiUrl.replace(/\/+$/, "")}/users?select=id&limit=1`,
+        cors: true,
+      },
+    ],
+    [config],
+  );
+
+  const [status, setStatus] = useState<Record<ServerKey, { st: St; ms: number | null }>>(() =>
+    Object.fromEntries(targets.map((t) => [t.key, { st: "checking", ms: null }])) as Record<
+      ServerKey,
+      { st: St; ms: number | null }
+    >,
+  );
+  const [busy, setBusy] = useState(false);
+
+  const run = useCallback(() => {
+    setBusy(true);
+    setStatus(
+      Object.fromEntries(targets.map((t) => [t.key, { st: "checking", ms: null }])) as Record<
+        ServerKey,
+        { st: St; ms: number | null }
+      >,
+    );
+    probeAll(targets, (key, r) => {
+      setStatus((prev) => ({
+        ...prev,
+        [key]: { st: r.online ? "online" : "offline", ms: r.latencyMs },
+      }));
+    }).finally(() => setBusy(false));
+  }, [targets]);
+
+  useEffect(() => {
+    run();
+  }, [run]);
+
+  const onlineCount = targets.filter((t) => status[t.key]?.st === "online").length;
 
   const submit = () => {
     if (!sel) {
@@ -48,52 +125,96 @@ export function LoginScreen() {
 
         <div className="rt-stripe relative mx-10 mt-7" />
 
-        {/* живые источники */}
-        <div className="relative mx-10 mt-8 space-y-2.5">
-          {SOURCES.map((s, i) => (
-            <div
-              key={s.label}
-              className="rise flex items-center gap-3.5 rounded-lg border border-line bg-panel2/70 px-4 py-3"
-              style={{ animationDelay: `${i * 110}ms` }}
+        {/* ── живой статус сервисов ── */}
+        <div className="relative mx-10 mt-8 flex min-h-0 flex-1 flex-col">
+          <div className="mb-3 flex items-center gap-2.5">
+            <span className="font-display text-[11px] tracking-[0.22em] text-dim">СТАТУС СЕРВИСОВ</span>
+            <span
+              className={`rounded-full border px-2 py-0.5 font-mono text-[9.5px] tabular-nums transition-colors ${
+                onlineCount === targets.length
+                  ? "border-live/50 bg-live/10 text-live"
+                  : onlineCount === 0
+                    ? "border-rec/50 bg-rec/10 text-rec"
+                    : "border-amber/50 bg-amber/10 text-amber"
+              }`}
             >
-              <s.icon className={`h-5 w-5 ${s.tone}`} />
-              <div className="min-w-0">
-                <div className="truncate text-[13px] font-semibold text-fg">{s.label}</div>
-                <div className="font-mono text-[10px] text-faint">{s.note}</div>
-              </div>
-              <span className="led ml-auto bg-live shadow-[0_0_7px_rgba(49,217,138,0.9)]" />
-            </div>
-          ))}
-        </div>
-
-        {/* сводка систем */}
-        <div className="relative mx-10 mt-8 flex-1">
-          <div className="grid h-full grid-rows-3 gap-2.5">
-            {SOURCES.map((s, i) => (
-              <div
-                key={`tile-${s.label}`}
-                className="rise flex items-center gap-4 overflow-hidden rounded-lg border border-line bg-panel2/50 px-5"
-                style={{ animationDelay: `${400 + i * 130}ms` }}
-              >
-                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-md border border-line bg-panel ${s.tone}`}>
-                  <s.icon className="h-5 w-5" />
-                </span>
-                <div className="min-w-0">
-                  <div className="truncate font-display text-[11px] tracking-[0.16em] text-fg">
-                    {s.label.split("·")[1]?.trim() ?? s.label}
-                  </div>
-                  <div className="truncate font-mono text-[9.5px] tracking-wider text-faint">{s.note}</div>
-                </div>
-                <span className="ml-auto flex shrink-0 items-center gap-1.5 font-mono text-[9px] tracking-widest text-live">
-                  <span className="led bg-live shadow-[0_0_7px_rgba(49,217,138,0.9)]" />
-                  ОНЛАЙН
-                </span>
-              </div>
-            ))}
+              {onlineCount}/{targets.length}
+            </span>
+            <button
+              onClick={run}
+              disabled={busy}
+              title="Повторить опрос серверов"
+              className="ml-auto grid h-7 w-7 place-items-center rounded-md border border-line bg-panel2 text-dim transition-all hover:border-hud/60 hover:text-hud active:scale-90 disabled:opacity-50"
+            >
+              <IcRefresh className={`h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} />
+            </button>
           </div>
+
+          <div className="space-y-2.5">
+            {targets.map((t, i) => {
+              const s = status[t.key] ?? { st: "checking" as St, ms: null };
+              return (
+                <div
+                  key={t.key}
+                  className="rise group relative flex items-center gap-3.5 overflow-hidden rounded-lg border border-line bg-panel2/70 px-4 py-3 transition-all duration-200 hover:border-line2"
+                  style={{ animationDelay: `${i * 110}ms` }}
+                >
+                  {/* цветовая кромка слева при онлайне */}
+                  <span
+                    className={`absolute inset-y-0 left-0 w-[3px] transition-opacity duration-300 ${
+                      s.st === "online" ? "opacity-100" : "opacity-0"
+                    }`}
+                    style={{ background: t.glow.replace("0.28", "1").replace("0.3", "1") }}
+                  />
+                  <span
+                    className={`grid h-9 w-9 shrink-0 place-items-center rounded-md border border-line bg-panel transition-shadow duration-300 ${t.tone}`}
+                    style={s.st === "online" ? { boxShadow: `0 0 14px ${t.glow}` } : undefined}
+                  >
+                    <t.icon className="h-4.5 w-4.5" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className={`truncate font-display text-[11px] tracking-[0.16em] ${s.st === "offline" ? "text-faint" : "text-fg"}`}>
+                      {t.name}
+                    </div>
+                    <div className="truncate font-mono text-[9.5px] tracking-wider text-faint">{t.sub}</div>
+                  </div>
+
+                  {/* индикатор состояния */}
+                  <div className="ml-auto flex shrink-0 flex-col items-end gap-0.5">
+                    {s.st === "checking" && (
+                      <span className="flex items-center gap-1.5 font-mono text-[9px] tracking-widest text-amber">
+                        <span className="led blink-rec bg-amber shadow-[0_0_7px_rgba(255,138,61,0.9)]" />
+                        ОПРОС…
+                      </span>
+                    )}
+                    {s.st === "online" && (
+                      <span className="flex items-center gap-1.5 font-mono text-[9px] tracking-widest text-live">
+                        <span className="led bg-live shadow-[0_0_7px_rgba(49,217,138,0.9)]" />
+                        ОНЛАЙН
+                      </span>
+                    )}
+                    {s.st === "offline" && (
+                      <span className="flex items-center gap-1.5 font-mono text-[9px] tracking-widest text-rec">
+                        <span className="led bg-rec shadow-[0_0_7px_rgba(255,77,94,0.9)]" />
+                        ОФЛАЙН
+                      </span>
+                    )}
+                    <span className="font-mono text-[8.5px] tabular-nums text-faint">
+                      {s.st === "online" && s.ms !== null ? `${s.ms} мс` : s.st === "offline" ? "нет ответа" : "…"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="mt-auto pb-2 pt-4 font-mono text-[8.5px] leading-relaxed tracking-wider text-faint">
+            опрос выполняется из браузера · видеопоток проверяется через MediaMTX ·
+            PostgreSQL — через PostgREST
+          </p>
         </div>
 
-        <div className="relative flex items-center justify-between px-10 py-6 font-mono text-[9.5px] tracking-wider text-faint">
+        <div className="relative flex items-center justify-between px-10 py-5 font-mono text-[9.5px] tracking-wider text-faint">
           <span>пульт наблюдения · пост 7 · смена Б</span>
           <span>канал защищён · ФСТЭК-Б</span>
         </div>
