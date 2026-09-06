@@ -59,10 +59,10 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
             }`}
             title={
               dbStatus.state === "online"
-                ? `rt-api · база данных и API · ${dbStatus.latencyMs} мс · пользователей в БД: ${dbStatus.userCount}`
+                ? `rt-db · база данных · ${dbStatus.latencyMs} мс · пользователей в БД: ${dbStatus.userCount}`
                 : dbStatus.state === "error"
-                  ? `rt-api недоступна: ${dbStatus.error} — локальный режим`
-                  : "rt-api · локальный режим (localStorage)"
+                  ? `rt-db недоступна: ${dbStatus.error} — локальный режим`
+                  : "rt-db · локальный режим (localStorage)"
             }
           >
             <span
@@ -74,7 +74,7 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
                     : "bg-faint"
               }`}
             />
-            RT-API
+            RT-DB
             {dbStatus.state === "online"
               ? `·${dbStatus.latencyMs}мс`
               : dbStatus.state === "error"
@@ -139,7 +139,7 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
           <>
             <button
               onClick={onOpenServers}
-              title="Редактировать подключения к серверам (rt-video · rt-audio · rt-docs · rt-api)"
+              title="Редактировать подключения к серверам (rt-video · rt-audio · rt-docs · rt-db)"
               className="flex h-8 items-center gap-1.5 rounded-full border border-violet/50 bg-violet/10 px-2.5 text-violet transition-all hover:border-violet hover:bg-violet/20 hover:shadow-[0_0_14px_rgba(122,92,245,0.3)] active:scale-95"
             >
               <IcGear className="h-4 w-4" />

@@ -53,7 +53,7 @@ export function LoginScreen() {
         icon: IcDb,
         tone: "text-violet",
         glow: "rgba(122,92,245,0.3)",
-        name: "RT-API",
+        name: "RT-DB",
         sub: `данные · ${strip(config.backend.apiUrl)}`,
         url: `${config.backend.apiUrl.replace(/\/+$/, "")}/users?select=id&limit=1`,
         cors: true,
