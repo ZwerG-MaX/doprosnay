@@ -39,6 +39,8 @@ export interface RoomDef {
 
 export interface UserRec {
   id: string;
+  login: string; // логин для авторизации
+  password: string; // пароль (в проде — хэш на сервере)
   name: string;
   title: string;
   isAdmin: boolean;
@@ -110,14 +112,14 @@ export const ROOMS: RoomDef[] = [
 /* ── пользователи и права (по умолчанию) ──────────── */
 
 export const DEFAULT_USERS: UserRec[] = [
-  { id: "u1", name: "Соколов", title: "специалист", isAdmin: true, color: "#00b0f0", view: ["r1", "r2", "r3"], edit: ["r1", "r2", "r3"] },
-  { id: "u2", name: "Ерёмина", title: "специалист", isAdmin: false, color: "#f04e9a", view: ["r1", "r2", "r3"], edit: ["r1", "r2"] },
-  { id: "u3", name: "Волков", title: "специалист", isAdmin: false, color: "#31d98a", view: ["r1", "r2"], edit: ["r1"] },
-  { id: "u4", name: "Данилова О. В.", title: "специалист", isAdmin: false, color: "#b57bff", view: ["r2"], edit: [] },
-  { id: "u5", name: "Гущин П. А.", title: "специалист", isAdmin: false, color: "#ff8a3d", muted: true, view: ["r1"], edit: [] },
-  { id: "u6", name: "Ким С. Р.", title: "специалист", isAdmin: false, color: "#ffd83d", view: ["r1", "r2"], edit: ["r1", "r2"] },
-  { id: "u7", name: "Ланская Е. А.", title: "специалист", isAdmin: false, color: "#7a9bff", view: ["r1", "r2"], edit: [] },
-  { id: "u8", name: "Крамаренко Д. И.", title: "специалист", isAdmin: false, color: "#ff6b6b", view: ["r1", "r3"], edit: ["r3"] },
+  { id: "u1", login: "sokolov", password: "skit", name: "Соколов", title: "специалист", isAdmin: true, color: "#00b0f0", view: ["r1", "r2", "r3"], edit: ["r1", "r2", "r3"] },
+  { id: "u2", login: "eremina", password: "skit", name: "Ерёмина", title: "специалист", isAdmin: false, color: "#f04e9a", view: ["r1", "r2", "r3"], edit: ["r1", "r2"] },
+  { id: "u3", login: "volkov", password: "skit", name: "Волков", title: "специалист", isAdmin: false, color: "#31d98a", view: ["r1", "r2"], edit: ["r1"] },
+  { id: "u4", login: "danilova", password: "skit", name: "Данилова О. В.", title: "специалист", isAdmin: false, color: "#b57bff", view: ["r2"], edit: [] },
+  { id: "u5", login: "gushchin", password: "skit", name: "Гущин П. А.", title: "специалист", isAdmin: false, color: "#ff8a3d", muted: true, view: ["r1"], edit: [] },
+  { id: "u6", login: "kim", password: "skit", name: "Ким С. Р.", title: "специалист", isAdmin: false, color: "#ffd83d", view: ["r1", "r2"], edit: ["r1", "r2"] },
+  { id: "u7", login: "lanskaya", password: "skit", name: "Ланская Е. А.", title: "специалист", isAdmin: false, color: "#7a9bff", view: ["r1", "r2"], edit: [] },
+  { id: "u8", login: "kramarenko", password: "skit", name: "Крамаренко Д. И.", title: "специалист", isAdmin: false, color: "#ff6b6b", view: ["r1", "r3"], edit: ["r3"] },
 ];
 
 /* ── конфигурация серверов (по умолчанию) ─────────── */

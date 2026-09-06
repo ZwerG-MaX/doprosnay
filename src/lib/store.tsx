@@ -58,8 +58,10 @@ interface StoreValue {
   roomId: string;
   room: RoomDef;
   myRooms: RoomDef[];
-  login: (userId: string) => void;
+  login: (loginStr: string, password: string) => Promise<UserRec | null>;
   logout: () => void;
+  createUser: (u: Omit<UserRec, "id">) => UserRec;
+  deleteUser: (id: string) => boolean;
   setRoomId: (id: string) => void;
   saveConfig: (c: ServerConfig) => void;
   patchUser: (id: string, patch: Partial<UserRec>) => boolean;
@@ -113,17 +115,65 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const room = ROOMS.find((r) => r.id === effRoomId) ?? ROOMS[0];
 
   const login = useCallback(
-    (userId: string) => {
-      const u = users.find((x) => x.id === userId);
-      if (!u) return;
-      setSessionId(userId);
+    async (loginStr: string, password: string): Promise<UserRec | null> => {
+      const l = loginStr.trim().toLowerCase();
+      /* 1) если БД доступна — проверяем через RPC (пароль не попадает в список) */
+      if (backend.online) {
+        try {
+          const u = await backend.checkLogin(l, password);
+          if (u) {
+            setSessionId(u.id);
+            const first = ROOMS.find((r) => u.isAdmin || u.view.includes(r.id));
+            if (first) setRoomIdState(first.id);
+            log.info("AUTH", `Вход в систему: ${u.name} (${l})`, "источник: PostgreSQL");
+            backend.audit("auth", `Вход в систему: ${u.name}`, u.name);
+            return u;
+          }
+          return null;
+        } catch {
+          /* БД отвалилась в процессе — переходим к локальной проверке */
+        }
+      }
+      /* 2) локальный режим — сравнение с гидрированным списком */
+      const u = users.find((x) => x.login.toLowerCase() === l && x.password === password);
+      if (!u) return null;
+      setSessionId(u.id);
       const first = ROOMS.find((r) => u.isAdmin || u.view.includes(r.id));
       if (first) setRoomIdState(first.id);
+      log.info("AUTH", `Вход в систему: ${u.name} (${l})`, "источник: локальный список");
+      return u;
     },
     [users],
   );
 
   const logout = useCallback(() => setSessionId(null), []);
+
+  const createUser = useCallback(
+    (data: Omit<UserRec, "id">): UserRec => {
+      const id = `u${Date.now().toString(36)}`;
+      const u: UserRec = { ...data, id };
+      setUsers((prev) => [...prev, u]);
+      log.info("AUTH", `Создан пользователь ${u.name} (${u.login})`, u.isAdmin ? "роль: администратор" : "роль: пользователь");
+      if (backend.online)
+        backend.upsertUser(u).catch((e) => log.error("DB", "Не удалось сохранить нового пользователя в БД", String(e)));
+      return u;
+    },
+    [],
+  );
+
+  const deleteUser = useCallback(
+    (id: string): boolean => {
+      const target = users.find((u) => u.id === id);
+      if (!target) return false;
+      if (target.isAdmin && users.filter((u) => u.isAdmin).length <= 1) return false; // последний админ
+      setUsers((prev) => prev.filter((u) => u.id !== id));
+      log.info("AUTH", `Удалён пользователь ${target.name} (${target.login})`);
+      if (backend.online)
+        backend.deleteUser(id).catch((e) => log.error("DB", "Не удалось удалить пользователя из БД", String(e)));
+      return true;
+    },
+    [users],
+  );
 
   const setRoomId = useCallback((id: string) => setRoomIdState(id), []);
 
@@ -227,6 +277,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     myRooms,
     login,
     logout,
+    createUser,
+    deleteUser,
     setRoomId,
     saveConfig,
     patchUser,

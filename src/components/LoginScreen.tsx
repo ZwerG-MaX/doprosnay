@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useStore } from "../lib/store";
 import { probeAll } from "../lib/probe";
-import { RtMark, IcShield, IcCam, IcRadio, IcFile, IcDb, IcRefresh } from "./Icons";
+import { RtMark, IcCam, IcRadio, IcFile, IcDb, IcRefresh } from "./Icons";
 
 type ServerKey = "macroscop" | "mumble" | "onlyoffice" | "pg";
 type St = "checking" | "online" | "offline";
@@ -9,10 +9,11 @@ type St = "checking" | "online" | "offline";
 const strip = (u: string) => u.replace(/^https?:\/\//, "").replace(/\/+$/, "");
 
 export function LoginScreen() {
-  const { users, login, config } = useStore();
-  const [sel, setSel] = useState<string | null>(null);
+  const { login, config } = useStore();
+  const [loginStr, setLoginStr] = useState("");
   const [pwd, setPwd] = useState("");
-  const [err, setErr] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
 
   /* ── цели опроса четырёх серверов ── */
   const targets = useMemo(
@@ -91,16 +92,21 @@ export function LoginScreen() {
 
   const onlineCount = targets.filter((t) => status[t.key]?.st === "online").length;
 
-  const submit = () => {
-    if (!sel) {
-      setErr(true);
-      window.setTimeout(() => setErr(false), 500);
+  const submit = async () => {
+    if (!loginStr.trim() || !pwd) {
+      setErr("Введите логин и пароль");
+      window.setTimeout(() => setErr(null), 2600);
       return;
     }
-    login(sel);
+    setAuthBusy(true);
+    setErr(null);
+    const u = await login(loginStr, pwd);
+    setAuthBusy(false);
+    if (!u) {
+      setErr("Неверный логин или пароль");
+      window.setTimeout(() => setErr(null), 2600);
+    }
   };
-
-  const selUser = users.find((u) => u.id === sel) ?? null;
 
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
@@ -233,70 +239,55 @@ export function LoginScreen() {
             Вход в <span className="rt-grad-text">пульт наблюдения</span>
           </h1>
           <p className="mt-1.5 text-[13px] text-dim">
-            Выберите учётную запись. Администратору доступны настройки серверов и управление доступом.
+            Введите логин и пароль. Учётные записи и права назначает администратор.
           </p>
 
-          {/* список учётных записей */}
-          <div className="mt-5 max-h-[300px] space-y-1.5 overflow-y-auto rounded-xl border border-line bg-panel/70 p-2">
-            {users.map((u) => {
-              const active = sel === u.id;
-              return (
-                <button
-                  key={u.id}
-                  onClick={() => setSel(u.id)}
-                  className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-all duration-150 ${
-                    active
-                      ? "border-hud/70 bg-hud/10 shadow-[0_0_16px_rgba(0,176,240,0.15)]"
-                      : "border-transparent hover:border-line hover:bg-panel2/70"
-                  }`}
-                >
-                  <span
-                    className="grid h-8 w-8 shrink-0 place-items-center rounded-full font-display text-[11px] font-bold text-ink"
-                    style={{ background: u.color }}
-                  >
-                    {u.name.slice(0, 2).toUpperCase()}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-[13px] font-semibold text-fg">{u.name}</span>
-                    <span className="block truncate font-mono text-[10px] text-faint">{u.title}</span>
-                  </span>
-                  {u.isAdmin && (
-                    <span className="ml-auto flex shrink-0 items-center gap-1 rounded-full border border-violet/50 bg-violet/15 px-2 py-0.5 font-mono text-[9px] tracking-wider text-violet">
-                      <IcShield className="h-3 w-3" /> АДМИН
-                    </span>
-                  )}
-                  {active && !u.isAdmin && (
-                    <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-hud shadow-[0_0_8px_rgba(0,176,240,0.9)]" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          {/* сообщение об ошибке */}
+          {err && (
+            <div className="mt-4 flex items-center gap-2 rounded-lg border border-rec/50 bg-rec/10 px-3.5 py-2.5 font-mono text-[11px] tracking-wide text-rec">
+              <span className="led bg-rec shadow-[0_0_7px_rgba(255,77,94,0.9)]" />
+              {err}
+            </div>
+          )}
+
+          {/* логин */}
+          <label className="mt-5 block">
+            <span className="mb-1.5 block font-mono text-[10px] tracking-[0.22em] text-faint">ЛОГИН</span>
+            <input
+              type="text"
+              autoComplete="username"
+              value={loginStr}
+              onChange={(e) => setLoginStr(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submit()}
+              placeholder="например, sokolov"
+              className="h-11 w-full rounded-lg border border-line bg-panel2 px-3.5 font-mono text-[13px] lowercase text-fg outline-none transition-all placeholder:text-faint focus:border-hud/70 focus:shadow-[0_0_0_3px_rgba(0,176,240,0.12)]"
+            />
+          </label>
 
           {/* пароль */}
-          <label className="mt-4 block">
+          <label className="mt-3 block">
             <span className="mb-1.5 block font-mono text-[10px] tracking-[0.22em] text-faint">ПАРОЛЬ</span>
             <input
               type="password"
+              autoComplete="current-password"
               value={pwd}
               onChange={(e) => setPwd(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()}
-              placeholder="любой пароль · демонстрационный режим"
+              placeholder="••••••"
               className="h-11 w-full rounded-lg border border-line bg-panel2 px-3.5 font-mono text-[13px] text-fg outline-none transition-all placeholder:text-faint focus:border-hud/70 focus:shadow-[0_0_0_3px_rgba(0,176,240,0.12)]"
             />
           </label>
 
           <button
             onClick={submit}
-            disabled={!sel}
-            className="rt-grad-bg mt-4 flex h-12 w-full items-center justify-center gap-2.5 rounded-lg font-display text-[13px] font-bold tracking-[0.2em] text-white transition-all hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35 disabled:saturate-50"
+            disabled={authBusy || !loginStr.trim() || !pwd}
+            className="rt-grad-bg mt-5 flex h-12 w-full items-center justify-center gap-2.5 rounded-lg font-display text-[13px] font-bold tracking-[0.2em] text-white transition-all hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35 disabled:saturate-50"
           >
-            ВОЙТИ В СИСТЕМУ
-            {selUser && <span className="font-mono text-[10px] font-normal opacity-80">· {selUser.name}</span>}
+            {authBusy ? "ПРОВЕРКА…" : "ВОЙТИ В СИСТЕМУ"}
           </button>
 
           <p className="mt-3 text-center font-mono text-[9.5px] leading-relaxed tracking-wide text-faint">
-            демо-среда · права и настройки серверов сохраняются локально · сброс — через админ-панель
+            демо-доступ: <b className="text-dim">sokolov / skit</b> (администратор) · список учётных записей — в PostgreSQL
           </p>
         </div>
       </main>
