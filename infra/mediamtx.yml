@@ -2,11 +2,18 @@
 #
 # ── Источники ────────────────────────────────────────────────────
 # По умолчанию source указывает на демо-VMS (сервис vms-demo в docker-compose),
-# который отдаёт тестовые RTSP-таблицы с таймкодом — эмуляция MACROSCOP.
+# который отдаёт тестовые RTSP-таблицы с таймкодом.
 #
-# Для РЕАЛЬНОГО MACROSCOP замените каждый source на RTSP-адрес камеры VMS,
-# например:  rtsp://<ip-vms>:554/macroscop/cam01_main
+# MediaMTX не привязан к конкретной VMS: подойдёт ЛЮБАЯ система, отдающая RTSP
+# (MACROSCOP, TRASSIR, Hikvision, Dahua, Blue Iris, go2rtc/Frigate, отдельные
+# IP-камеры — см. таблицу в README, раздел «Совместимость: любая VMS с RTSP»).
+# Замените каждый source на RTSP-адрес вашего источника, например:
+#   rtsp://vms:554/macroscop/cam01_main            (MACROSCOP)
+#   rtsp://trassir:554/cam01                        (TRASSIR)
+#   rtsp://user:pass@ip:554/Streaming/Channels/101  (Hikvision / камера)
 # (внутри сети контейнеров — IP/имя хоста VMS, не localhost).
+# Если VMS умеет только «пушить» поток — MediaMTX может принять публикацию:
+#   source: publisher  (камера/VMS пишет в rtsp://media:8554/cam01).
 #
 # ── Чтение потоков из браузера ───────────────────────────────────
 #   WebRTC (минимальная задержка): http://localhost:8889/cam01

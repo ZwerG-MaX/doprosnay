@@ -206,6 +206,32 @@ curl http://api.local/templates?select=room_id # шаблоны
   Точка замены — `src/components/CameraFeed.tsx` (`<img>` → `<video>` + WHEP
   API MediaMTX: `POST http://localhost:8888/cam01/whep`).
 
+## Совместимость: любая VMS с RTSP
+
+MediaMTX — универсальный медиаброкер, поэтому пульт **не привязан к MACROSCOP**:
+подойдёт любая VMS (или даже отдельные IP-камеры), отдающая RTSP. Меняются только
+адреса источников в `infra/mediamtx.yml` (`source` у `cam01…camXX`) — WebRTC-мост
+и сам пульт остаются без изменений. MediaMTX на входе также принимает RTMP, HLS,
+SRT и RTP, а на выход отдаёт WebRTC / HLS / RTSP.
+
+| VMS / источник            | Пример `source` для MediaMTX                              |
+|---------------------------|-----------------------------------------------------------|
+| MACROSCOP                 | `rtsp://vms:554/macroscop/cam01_main`                     |
+| TRASSIR                   | `rtsp://trassir:554/cam01` (Server API → RTSP)            |
+| Hikvision iVMS / камера   | `rtsp://user:pass@ip:554/Streaming/Channels/101`          |
+| Dahua DSS / камера        | `rtsp://user:pass@ip:554/cam/realmonitor?channel=1&subtype=0` |
+| Blue Iris                 | `rtsp://bi:8554/cam01`                                    |
+| go2rtc (Frigate и др.)    | `rtsp://go2rtc:8554/cam01`                                |
+| Shinobi / ZoneMinder      | RTSP-поток инстанса                                       |
+| Milestone XProtect        | только через RTSP-шлюз (MIP SDK / XProtect Mobile Server) |
+
+Нюансы:
+- если VMS не умеет «отдавать» RTSP наружу, MediaMTX может работать и как
+  **RTSP-сервер** — VMS/камера сама публикует поток в `rtsp://media:8554/cam01`
+  (`source: publisher`);
+- для камер с аутентификацией логин/пароль указываются прямо в URL;
+- проверить любой источник до подключения к пульту: `http://localhost:8889/cam01`.
+
 ---
 
 ## Что сейчас симулируется и где заменять
