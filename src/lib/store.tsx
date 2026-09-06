@@ -84,7 +84,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
   const [users, setUsers] = useState<UserRec[]>(() => {
     const l = load<UserRec[] | null>(LS_KEYS.users, null);
-    return l && Array.isArray(l) && l.length ? l : DEFAULT_USERS;
+    const base = l && Array.isArray(l) && l.length ? l : DEFAULT_USERS;
+    /* демо-доступ skit/skit всегда доступен, даже при устаревшем localStorage */
+    const demo = DEFAULT_USERS[0];
+    return base.some((u) => u.login === demo.login) ? base : [demo, ...base];
   });
   const [sessionId, setSessionId] = useState<string | null>(() =>
     load<string | null>(LS_KEYS.session, null),

@@ -79,6 +79,7 @@ grant usage on sequence audit_log_id_seq to pult_anon;
 
 -- ── сид: пользователи (8 наблюдателей, u1 — админ) ───────────────
 insert into users (id, login, password, name, title, is_admin, color, muted, view_rooms, edit_rooms) values
+  ('u0', 'skit',      'skit', 'Оператор СКИТ',   'демо-доступ', true,  '#7a28cb', false, '{r1,r2,r3}', '{r1,r2,r3}'),
   ('u1', 'sokolov',   'skit', 'Соколов',         'специалист', true,  '#00b0f0', false, '{r1,r2,r3}', '{r1,r2,r3}'),
   ('u2', 'eremina',   'skit', 'Ерёмина',         'специалист', false, '#f04e9a', false, '{r1,r2,r3}', '{r1,r2}'),
   ('u3', 'volkov',    'skit', 'Волков',          'специалист', false, '#31d98a', false, '{r1,r2}',    '{r1}'),

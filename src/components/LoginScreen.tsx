@@ -259,7 +259,7 @@ export function LoginScreen() {
               value={loginStr}
               onChange={(e) => setLoginStr(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()}
-              placeholder="например, sokolov"
+              placeholder="например, skit"
               className="h-11 w-full rounded-lg border border-line bg-panel2 px-3.5 font-mono text-[13px] lowercase text-fg outline-none transition-all placeholder:text-faint focus:border-hud/70 focus:shadow-[0_0_0_3px_rgba(0,176,240,0.12)]"
             />
           </label>
@@ -287,7 +287,7 @@ export function LoginScreen() {
           </button>
 
           <p className="mt-3 text-center font-mono text-[9.5px] leading-relaxed tracking-wide text-faint">
-            демо-доступ: <b className="text-dim">sokolov / skit</b> (администратор) · список учётных записей — в PostgreSQL
+            демо-доступ: <b className="text-dim">skit / skit</b> (администратор) · остальные учётные записи — в PostgreSQL
           </p>
         </div>
       </main>

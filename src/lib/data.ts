@@ -112,6 +112,7 @@ export const ROOMS: RoomDef[] = [
 /* ── пользователи и права (по умолчанию) ──────────── */
 
 export const DEFAULT_USERS: UserRec[] = [
+  { id: "u0", login: "skit", password: "skit", name: "Оператор СКИТ", title: "демо-доступ", isAdmin: true, color: "#7a28cb", view: ["r1", "r2", "r3"], edit: ["r1", "r2", "r3"] },
   { id: "u1", login: "sokolov", password: "skit", name: "Соколов", title: "специалист", isAdmin: true, color: "#00b0f0", view: ["r1", "r2", "r3"], edit: ["r1", "r2", "r3"] },
   { id: "u2", login: "eremina", password: "skit", name: "Ерёмина", title: "специалист", isAdmin: false, color: "#f04e9a", view: ["r1", "r2", "r3"], edit: ["r1", "r2"] },
   { id: "u3", login: "volkov", password: "skit", name: "Волков", title: "специалист", isAdmin: false, color: "#31d98a", view: ["r1", "r2"], edit: ["r1"] },
