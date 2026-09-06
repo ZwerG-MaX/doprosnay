@@ -118,7 +118,7 @@ export function LoginScreen() {
               СКИТ
             </div>
             <div className="mt-1.5 font-mono text-[10px] tracking-[0.3em] text-dim">
-              ДОПРОСНАЯ · СИЗО-1
+              ДОПРОСНАЯ
             </div>
           </div>
         </div>

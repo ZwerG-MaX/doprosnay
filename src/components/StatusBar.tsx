@@ -30,7 +30,7 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
             <span className="hidden text-dim sm:inline">· Допросная</span>
           </div>
           <div className="truncate font-mono text-[9px] tracking-wider text-faint">
-            {room.code} · {room.name.toUpperCase()} · СИЗО-1
+            {room.code} · {room.name.toUpperCase()}
           </div>
         </div>
       </div>
