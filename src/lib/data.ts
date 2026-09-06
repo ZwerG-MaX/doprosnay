@@ -39,6 +39,8 @@ export interface RoomDef {
 
 export interface UserRec {
   id: string;
+  login: string; // логин для авторизации
+  password: string; // пароль (в проде — хэш на сервере)
   name: string;
   title: string;
   isAdmin: boolean;
@@ -64,9 +66,17 @@ const IMG_B =
 const IMG_C =
   "https://image.qwenlm.ai/generated-images/21fdf25a-e53b-4830-98b1-3344d1c2c7b1/_result.png";
 
+/** Пресеты видеокадров, которые админ может назначать камерам новых комнат. */
+export const CAM_PRESETS: { id: string; label: string; src: string; kb: string }[] = [
+  { id: "A", label: "Общий план", src: IMG_A, kb: "kb-1" },
+  { id: "B", label: "Крупный план", src: IMG_B, kb: "kb-2" },
+  { id: "C", label: "Вид сверху", src: IMG_C, kb: "kb-3" },
+];
+
 /* ── комнаты ──────────────────────────────────────── */
 
-export const ROOMS: RoomDef[] = [
+/** Комнаты по умолчанию — одна допросная. Остальные добавляет администратор. */
+export const DEFAULT_ROOMS: RoomDef[] = [
   {
     id: "r1",
     code: "Д-01",
@@ -80,44 +90,37 @@ export const ROOMS: RoomDef[] = [
       { id: "cam03", num: "CAM 03", label: "ВИД СВЕРХУ", rtsp: "", src: IMG_C, kb: "kb-3" },
     ],
   },
-  {
-    id: "r2",
-    code: "Д-02",
-    name: "Допросная №2",
-    mumbleChannel: "Допросная №2",
-    docTitle: "Протокол наблюдения — комната №2",
-    docKey: "d02-2026-0417",
-    cameras: [
-      { id: "cam01", num: "CAM 01", label: "ШИРОКИЙ УГОЛ", rtsp: "", src: IMG_B, kb: "kb-2" },
-      { id: "cam02", num: "CAM 02", label: "ЛИЦО КРУПНО", rtsp: "", src: IMG_A, kb: "kb-1" },
-      { id: "cam03", num: "CAM 03", label: "ПОТОЛОЧНАЯ", rtsp: "", src: IMG_C, kb: "kb-3" },
-    ],
-  },
-  {
-    id: "r3",
-    code: "К-01",
-    name: "Комната очных ставок",
-    mumbleChannel: "Очная ставка",
-    docTitle: "Протокол очной ставки",
-    docKey: "k01-2026-0417",
-    cameras: [
-      { id: "cam01", num: "CAM 01", label: "ОБЩИЙ ПЛАН", rtsp: "", src: IMG_C, kb: "kb-3" },
-      { id: "cam02", num: "CAM 02", label: "БОКОВОЙ РАКУРС", rtsp: "", src: IMG_A, kb: "kb-1" },
-    ],
-  },
 ];
+
+/** Генерация уникального id для новой комнаты. */
+export const genRoomId = () => `r${Date.now().toString(36)}${Math.floor(Math.random() * 90 + 10)}`;
+
+/** Сборка новой камеры из пресета кадра. */
+export function makeCamera(presetId: string, index: number): CameraDef {
+  const p = CAM_PRESETS.find((x) => x.id === presetId) ?? CAM_PRESETS[0];
+  const n = String(index).padStart(2, "0");
+  return {
+    id: `cam${n}${Date.now().toString(36)}`,
+    num: `CAM ${n}`,
+    label: p.label.toUpperCase(),
+    rtsp: "",
+    src: p.src,
+    kb: p.kb,
+  };
+}
 
 /* ── пользователи и права (по умолчанию) ──────────── */
 
 export const DEFAULT_USERS: UserRec[] = [
-  { id: "u1", name: "Соколов", title: "специалист", isAdmin: true, color: "#00b0f0", view: ["r1", "r2", "r3"], edit: ["r1", "r2", "r3"] },
-  { id: "u2", name: "Ерёмина", title: "специалист", isAdmin: false, color: "#f04e9a", view: ["r1", "r2", "r3"], edit: ["r1", "r2"] },
-  { id: "u3", name: "Волков", title: "специалист", isAdmin: false, color: "#31d98a", view: ["r1", "r2"], edit: ["r1"] },
-  { id: "u4", name: "Данилова О. В.", title: "специалист", isAdmin: false, color: "#b57bff", view: ["r2"], edit: [] },
-  { id: "u5", name: "Гущин П. А.", title: "специалист", isAdmin: false, color: "#ff8a3d", muted: true, view: ["r1"], edit: [] },
-  { id: "u6", name: "Ким С. Р.", title: "специалист", isAdmin: false, color: "#ffd83d", view: ["r1", "r2"], edit: ["r1", "r2"] },
-  { id: "u7", name: "Ланская Е. А.", title: "специалист", isAdmin: false, color: "#7a9bff", view: ["r1", "r2"], edit: [] },
-  { id: "u8", name: "Крамаренко Д. И.", title: "специалист", isAdmin: false, color: "#ff6b6b", view: ["r1", "r3"], edit: ["r3"] },
+  { id: "u0", login: "skit", password: "skit", name: "Оператор СКИТ", title: "демо-доступ", isAdmin: true, color: "#7a28cb", view: ["r1", "r2", "r3"], edit: ["r1", "r2", "r3"] },
+  { id: "u1", login: "sokolov", password: "skit", name: "Соколов", title: "специалист", isAdmin: true, color: "#00b0f0", view: ["r1", "r2", "r3"], edit: ["r1", "r2", "r3"] },
+  { id: "u2", login: "eremina", password: "skit", name: "Ерёмина", title: "специалист", isAdmin: false, color: "#f04e9a", view: ["r1", "r2", "r3"], edit: ["r1", "r2"] },
+  { id: "u3", login: "volkov", password: "skit", name: "Волков", title: "специалист", isAdmin: false, color: "#31d98a", view: ["r1", "r2"], edit: ["r1"] },
+  { id: "u4", login: "danilova", password: "skit", name: "Данилова О. В.", title: "специалист", isAdmin: false, color: "#b57bff", view: ["r2"], edit: [] },
+  { id: "u5", login: "gushchin", password: "skit", name: "Гущин П. А.", title: "специалист", isAdmin: false, color: "#ff8a3d", muted: true, view: ["r1"], edit: [] },
+  { id: "u6", login: "kim", password: "skit", name: "Ким С. Р.", title: "специалист", isAdmin: false, color: "#ffd83d", view: ["r1", "r2"], edit: ["r1", "r2"] },
+  { id: "u7", login: "lanskaya", password: "skit", name: "Ланская Е. А.", title: "специалист", isAdmin: false, color: "#7a9bff", view: ["r1", "r2"], edit: [] },
+  { id: "u8", login: "kramarenko", password: "skit", name: "Крамаренко Д. И.", title: "специалист", isAdmin: false, color: "#ff6b6b", view: ["r1", "r3"], edit: ["r3"] },
 ];
 
 /* ── конфигурация серверов (по умолчанию) ─────────── */
@@ -139,6 +142,7 @@ export const LS_KEYS = {
   users: "rt-dopros.users.v2",
   session: "rt-dopros.session.v2",
   room: "rt-dopros.room.v2",
+  rooms: "rt-dopros.rooms.v2",
   templates: "rt-dopros.templates.v2",
 };
 
@@ -233,6 +237,24 @@ export const DEFAULT_TEMPLATES: Record<string, string> = {
 Подписи сторон:
 Следователь: ______________`,
 };
+
+/** Универсальный шаблон для комнат, у которых нет собственного (добавленных админом). */
+export const GENERIC_TEMPLATE = `ПРОТОКОЛ НАБЛЮДЕНИЯ
+Комната: {КОМНАТА} · Дело № {ДЕЛО}
+Дата: {ДАТА} · Время: {ВРЕМЯ} · Аудиоканал: {КАНАЛ}
+
+── УСТАНОВОЧНАЯ ЧАСТЬ ──
+
+
+── ЗАПИСИ НАБЛЮДАТЕЛЕЙ ──
+
+
+── ИТОГИ ──
+
+
+Подписи сторон:
+Следователь: ______________
+Старший смены: ______________`;
 
 const p2 = (n: number) => String(n).padStart(2, "0");
 

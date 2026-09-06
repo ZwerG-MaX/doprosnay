@@ -1,22 +1,88 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { ROOMS } from "../lib/data";
+import { type RoomDef, type UserRec } from "../lib/data";
 import { useStore } from "../lib/store";
-import { IcUsers, IcClose, IcEye, IcPen, IcShield } from "./Icons";
+import { IcUsers, IcClose, IcEye, IcPen, IcShield, IcPlus, IcTrash, IcChevR } from "./Icons";
 
 interface Props {
   onClose: () => void;
   onToast: (s: string) => void;
 }
 
+const COLORS = ["#00b0f0", "#f04e9a", "#31d98a", "#b57bff", "#ff8a3d", "#ffd83d", "#7a9bff", "#ff6b6b"];
+
+const emptyForm = {
+  name: "",
+  login: "",
+  password: "",
+  title: "специалист",
+  color: COLORS[0],
+  isAdmin: false,
+  view: [] as string[],
+  edit: [] as string[],
+};
+
 export function AccessManager({ onClose, onToast }: Props) {
-  const { users, me, patchUser } = useStore();
+  const { users, me, rooms, patchUser, createUser, deleteUser } = useStore();
+  const ROOMS: RoomDef[] = rooms;
+  const [formOpen, setFormOpen] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [formErr, setFormErr] = useState<string | null>(null);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  const toggleFormRoom = (key: "view" | "edit", roomId: string) =>
+    setForm((f) => {
+      const list = f[key].includes(roomId) ? f[key].filter((x) => x !== roomId) : [...f[key], roomId];
+      /* редактирование подразумевает просмотр */
+      if (key === "edit" && !f.view.includes(roomId) && !f[key].includes(roomId)) {
+        return { ...f, edit: list, view: [...f.view, roomId] };
+      }
+      return { ...f, [key]: list };
+    });
+
+  const submitForm = () => {
+    const login = form.login.trim().toLowerCase();
+    if (!form.name.trim() || !login || !form.password) {
+      setFormErr("Заполните имя, логин и пароль");
+      return;
+    }
+    if (users.some((u) => u.login.toLowerCase() === login)) {
+      setFormErr(`Логин «${login}» уже занят`);
+      return;
+    }
+    const u = createUser({
+      name: form.name.trim(),
+      login,
+      password: form.password,
+      title: form.title.trim() || "специалист",
+      color: form.color,
+      isAdmin: form.isAdmin,
+      view: form.view,
+      edit: form.edit,
+    });
+    onToast(`Пользователь ${u.name} (${u.login}) создан`);
+    setForm(emptyForm);
+    setFormErr(null);
+    setFormOpen(false);
+  };
+
+  const removeUser = (u: UserRec) => {
+    if (u.id === me?.id) {
+      onToast("Нельзя удалить собственную учётную запись");
+      return;
+    }
+    const ok = deleteUser(u.id);
+    if (!ok) {
+      onToast("Нельзя удалить последнего администратора");
+      return;
+    }
+    onToast(`Пользователь ${u.name} удалён`);
+  };
 
   const toggleIn = (list: string[], id: string) =>
     list.includes(id) ? list.filter((x) => x !== id) : [...list, id];
@@ -76,6 +142,137 @@ export function AccessManager({ onClose, onToast }: Props) {
         </header>
         <div className="rt-stripe" />
 
+        {/* ── создать пользователя ── */}
+        <div className="border-b border-line bg-panel2/40 px-4 py-2">
+          <button
+            onClick={() => setFormOpen((v) => !v)}
+            className="flex w-full items-center gap-2 rounded-md font-mono text-[11px] tracking-widest text-hud transition-colors hover:text-fg"
+          >
+            <IcChevR className={`h-3.5 w-3.5 transition-transform ${formOpen ? "rotate-90" : ""}`} />
+            <IcPlus className="h-3.5 w-3.5" />
+            НОВЫЙ ПОЛЬЗОВАТЕЛЬ
+          </button>
+
+          {formOpen && (
+            <div className="mt-2.5 space-y-2.5 pb-1">
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                <label className="block">
+                  <span className="mb-1 block font-mono text-[9px] tracking-[0.18em] text-faint">ИМЯ *</span>
+                  <input
+                    value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    placeholder="Фамилия"
+                    className="h-8 w-full rounded-md border border-line bg-panel px-2.5 font-mono text-[12px] text-fg outline-none focus:border-hud/70"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block font-mono text-[9px] tracking-[0.18em] text-faint">ЛОГИН *</span>
+                  <input
+                    value={form.login}
+                    onChange={(e) => setForm({ ...form, login: e.target.value.toLowerCase() })}
+                    placeholder="ivanov"
+                    className="h-8 w-full rounded-md border border-line bg-panel px-2.5 font-mono text-[12px] lowercase text-fg outline-none focus:border-hud/70"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block font-mono text-[9px] tracking-[0.18em] text-faint">ПАРОЛЬ *</span>
+                  <input
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    placeholder="пароль"
+                    className="h-8 w-full rounded-md border border-line bg-panel px-2.5 font-mono text-[12px] text-fg outline-none focus:border-hud/70"
+                  />
+                </label>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <label className="flex items-center gap-2">
+                  <span className="font-mono text-[9px] tracking-[0.18em] text-faint">ЦВЕТ</span>
+                  <span className="flex items-center gap-1">
+                    {COLORS.map((c) => (
+                      <button
+                        key={c}
+                        onClick={() => setForm({ ...form, color: c })}
+                        title={c}
+                        className={`h-5 w-5 rounded-full border-2 transition-transform hover:scale-110 ${
+                          form.color === c ? "border-fg scale-110" : "border-transparent"
+                        }`}
+                        style={{ background: c }}
+                      />
+                    ))}
+                  </span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={form.isAdmin}
+                    onChange={(e) => setForm({ ...form, isAdmin: e.target.checked })}
+                    className="h-3.5 w-3.5 accent-violet"
+                  />
+                  <span className="font-mono text-[10px] tracking-widest text-violet">АДМИНИСТРАТОР</span>
+                </label>
+              </div>
+
+              {/* права по комнатам */}
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
+                <span className="font-mono text-[9px] tracking-[0.18em] text-faint">ПРАВА:</span>
+                {ROOMS.map((r) => (
+                  <span key={r.id} className="flex items-center gap-1.5">
+                    <span className="font-mono text-[10px] text-hud">{r.code}</span>
+                    <button
+                      onClick={() => toggleFormRoom("view", r.id)}
+                      title={`Просмотр «${r.name}»`}
+                      className={`grid h-6 w-6 place-items-center rounded border transition-all ${
+                        form.view.includes(r.id)
+                          ? "border-hud/70 bg-hud/15 text-hud"
+                          : "border-line bg-panel text-faint hover:text-dim"
+                      }`}
+                    >
+                      <IcEye className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={() => toggleFormRoom("edit", r.id)}
+                      title={`Редактирование протокола «${r.name}»`}
+                      className={`grid h-6 w-6 place-items-center rounded border transition-all ${
+                        form.edit.includes(r.id)
+                          ? "border-live/70 bg-live/15 text-live"
+                          : "border-line bg-panel text-faint hover:text-dim"
+                      }`}
+                    >
+                      <IcPen className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+
+              {formErr && (
+                <div className="rounded-md border border-rec/50 bg-rec/10 px-2.5 py-1.5 font-mono text-[10px] text-rec">
+                  {formErr}
+                </div>
+              )}
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={submitForm}
+                  className="rt-grad-bg flex h-8 items-center rounded-md px-4 font-display text-[10.5px] tracking-[0.16em] text-white transition-all hover:brightness-110 active:scale-95"
+                >
+                  СОЗДАТЬ
+                </button>
+                <button
+                  onClick={() => {
+                    setForm(emptyForm);
+                    setFormErr(null);
+                    setFormOpen(false);
+                  }}
+                  className="flex h-8 items-center rounded-md border border-line bg-panel px-3 font-mono text-[10px] tracking-widest text-dim hover:text-fg"
+                >
+                  ОТМЕНА
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="min-h-0 flex-1 overflow-auto p-4">
           <table className="w-full border-separate border-spacing-y-1">
             <thead>
@@ -114,8 +311,18 @@ export function AccessManager({ onClose, onToast }: Props) {
                             {u.name}
                             {isMe && <span className="ml-1.5 font-mono text-[9px] text-hud">(вы)</span>}
                           </div>
-                          <div className="truncate font-mono text-[9px] text-faint">{u.title}</div>
+                          <div className="truncate font-mono text-[9px] text-faint">
+                            @{u.login} · {u.title}
+                          </div>
                         </div>
+                        <button
+                          onClick={() => removeUser(u)}
+                          title={isMe ? "Нельзя удалить себя" : `Удалить ${u.name}`}
+                          disabled={isMe}
+                          className={`ml-auto grid h-7 w-7 shrink-0 place-items-center rounded-md border border-line bg-panel text-faint opacity-0 transition-all group-hover:opacity-100 hover:border-rec/60 hover:text-rec active:scale-90 disabled:cursor-not-allowed disabled:hover:border-line disabled:hover:text-faint`}
+                        >
+                          <IcTrash className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     </td>
 

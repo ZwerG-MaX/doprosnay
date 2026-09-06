@@ -2,19 +2,20 @@ import { useState } from "react";
 import { useNow, useInterval, fmtClock, fmtDate, fmtDur, randInt } from "../lib/hooks";
 import { useStore, mumbleUrlOf } from "../lib/store";
 import type { DbStatus } from "../lib/backend";
-import { RtMark, IcGear, IcUsers, IcLogout, IcShield, IcFile, IcTemplate } from "./Icons";
+import { RtMark, IcGear, IcUsers, IcLogout, IcShield, IcFile, IcTemplate, IcRooms } from "./Icons";
 
 interface Props {
   sessionStart: number;
   dbStatus?: DbStatus;
   onOpenServers: () => void;
   onOpenAccess: () => void;
+  onOpenRooms: () => void;
   onOpenTemplates: () => void;
   onOpenLogs: () => void;
   onLogout: () => void;
 }
 
-export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess, onOpenTemplates, onOpenLogs, onLogout }: Props) {
+export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess, onOpenRooms, onOpenTemplates, onOpenLogs, onLogout }: Props) {
   const now = useNow(1000);
   const { config, me, room } = useStore();
   const [latency, setLatency] = useState(24);
@@ -30,7 +31,7 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
             <span className="hidden text-dim sm:inline">· Допросная</span>
           </div>
           <div className="truncate font-mono text-[9px] tracking-wider text-faint">
-            {room.code} · {room.name.toUpperCase()} · СИЗО-1
+            {room.code} · {room.name.toUpperCase()}
           </div>
         </div>
       </div>
@@ -58,10 +59,10 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
             }`}
             title={
               dbStatus.state === "online"
-                ? `PostgreSQL (PostgREST) · ${dbStatus.latencyMs} мс · пользователей в БД: ${dbStatus.userCount}`
+                ? `rt-db · база данных · ${dbStatus.latencyMs} мс · пользователей в БД: ${dbStatus.userCount}`
                 : dbStatus.state === "error"
-                  ? `PostgreSQL недоступна: ${dbStatus.error} — локальный режим`
-                  : "PostgreSQL · локальный режим (localStorage)"
+                  ? `rt-db недоступна: ${dbStatus.error} — локальный режим`
+                  : "rt-db · локальный режим (localStorage)"
             }
           >
             <span
@@ -73,7 +74,7 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
                     : "bg-faint"
               }`}
             />
-            PG
+            RT-DB
             {dbStatus.state === "online"
               ? `·${dbStatus.latencyMs}мс`
               : dbStatus.state === "error"
@@ -96,7 +97,7 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
               config.macroscop.enabled ? "bg-live shadow-[0_0_7px_rgba(49,217,138,0.9)]" : "bg-faint"
             }`}
           />
-          MACROSCOP{config.macroscop.enabled ? "" : "·ОТКЛ"}
+          RT-VIDEO{config.macroscop.enabled ? "" : "·ОТКЛ"}
         </span>
         <span
           className={`hidden items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] tracking-wider xl:flex ${
@@ -107,7 +108,7 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
           title={`${mumbleUrlOf(config)}${config.mumble.enabled ? "" : " · отключён администратором"}`}
         >
           <span className={`led ${config.mumble.enabled ? "bg-hud shadow-[0_0_7px_rgba(0,176,240,0.9)]" : "bg-faint"}`} />
-          MUMBLE{config.mumble.enabled ? `·${latency}мс` : "·ОТКЛ"}
+          RT-AUDIO{config.mumble.enabled ? `·${latency}мс` : "·ОТКЛ"}
         </span>
         <span className="flex items-center gap-2 rounded-full border border-rec/40 bg-rec/10 px-2.5 py-1">
           <span className="led blink-rec bg-rec shadow-[0_0_8px_rgba(255,77,94,0.9)]" />
@@ -138,7 +139,7 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
           <>
             <button
               onClick={onOpenServers}
-              title="Редактировать подключения к серверам (MACROSCOP · Mumble · ONLYOFFICE)"
+              title="Редактировать подключения к серверам (rt-video · rt-audio · rt-docs · rt-db)"
               className="flex h-8 items-center gap-1.5 rounded-full border border-violet/50 bg-violet/10 px-2.5 text-violet transition-all hover:border-violet hover:bg-violet/20 hover:shadow-[0_0_14px_rgba(122,92,245,0.3)] active:scale-95"
             >
               <IcGear className="h-4 w-4" />
@@ -146,10 +147,17 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
             </button>
             <button
               onClick={onOpenAccess}
-              title="Управление доступом: комнаты и права"
+              title="Управление доступом: пользователи и права"
               className="grid h-8 w-8 place-items-center rounded-full border border-line bg-panel2 text-dim transition-all hover:border-hud/60 hover:text-hud hover:shadow-[0_0_12px_rgba(0,176,240,0.25)] active:scale-90"
             >
               <IcUsers className="h-4 w-4" />
+            </button>
+            <button
+              onClick={onOpenRooms}
+              title="Управление комнатами: названия и камеры"
+              className="grid h-8 w-8 place-items-center rounded-full border border-line bg-panel2 text-dim transition-all hover:border-amber/60 hover:text-amber hover:shadow-[0_0_12px_rgba(255,138,61,0.25)] active:scale-90"
+            >
+              <IcRooms className="h-4 w-4" />
             </button>
             <button
               onClick={onOpenTemplates}

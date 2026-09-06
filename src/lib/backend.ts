@@ -13,7 +13,7 @@
  */
 
 import { log } from "./logger";
-import type { ServerConfig, UserRec } from "./data";
+import type { RoomDef, ServerConfig, UserRec } from "./data";
 
 export type DbState = "off" | "connecting" | "online" | "error";
 
@@ -27,6 +27,8 @@ export interface DbStatus {
 /* ── строки БД ↔ типы фронтенда ── */
 interface UserRow {
   id: string;
+  login: string;
+  password: string;
   name: string;
   title: string;
   is_admin: boolean;
@@ -52,8 +54,40 @@ export interface DocRow {
   updated_at: string;
 }
 
+interface RoomRow {
+  id: string;
+  code: string;
+  name: string;
+  mumble_channel: string;
+  doc_title: string;
+  doc_key: string;
+  cameras: unknown;
+}
+
+const rowToRoom = (r: RoomRow): RoomDef => ({
+  id: r.id,
+  code: r.code,
+  name: r.name,
+  mumbleChannel: r.mumble_channel,
+  docTitle: r.doc_title,
+  docKey: r.doc_key,
+  cameras: (Array.isArray(r.cameras) ? r.cameras : []) as RoomDef["cameras"],
+});
+
+const roomToRow = (r: RoomDef): RoomRow => ({
+  id: r.id,
+  code: r.code,
+  name: r.name,
+  mumble_channel: r.mumbleChannel,
+  doc_title: r.docTitle,
+  doc_key: r.docKey,
+  cameras: r.cameras,
+});
+
 const rowToUser = (r: UserRow): UserRec => ({
   id: r.id,
+  login: r.login,
+  password: r.password,
   name: r.name,
   title: r.title,
   isAdmin: r.is_admin,
@@ -65,6 +99,8 @@ const rowToUser = (r: UserRow): UserRec => ({
 
 const userToRow = (u: UserRec): UserRow => ({
   id: u.id,
+  login: u.login,
+  password: u.password,
   name: u.name,
   title: u.title,
   is_admin: u.isAdmin,
@@ -153,6 +189,30 @@ export const backend = {
       headers: UPSERT,
       body: JSON.stringify({ ...userToRow(u), updated_at: new Date().toISOString() }),
     }).then(() => undefined),
+
+  deleteUser: (id: string): Promise<void> =>
+    req(`/users?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" }).then(() => undefined),
+
+  /* ── комнаты ── */
+  fetchRooms: (): Promise<RoomDef[]> =>
+    req<RoomRow[]>("/rooms?select=*&order=id").then((rows) => rows.map(rowToRoom)),
+
+  saveRoom: (r: RoomDef): Promise<void> =>
+    req("/rooms", {
+      method: "POST",
+      headers: UPSERT,
+      body: JSON.stringify({ ...roomToRow(r), updated_at: new Date().toISOString() }),
+    }).then(() => undefined),
+
+  deleteRoom: (id: string): Promise<void> =>
+    req(`/rooms?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" }).then(() => undefined),
+
+  /** Проверка логина/пароля через RPC PostgREST (пароль не уходит в клиентский список). */
+  checkLogin: (login: string, password: string): Promise<UserRec | null> =>
+    req<UserRow[]>("/rpc/check_login", {
+      method: "POST",
+      body: JSON.stringify({ p_login: login, p_password: password }),
+    }).then((rows) => (rows && rows.length ? rowToUser(rows[0]) : null)),
 
   /* ── конфигурация серверов ── */
   fetchConfig: (): Promise<ServerConfig | null> =>

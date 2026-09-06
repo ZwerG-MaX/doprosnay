@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { createPortal } from "react-dom";
-import { ROOMS, TEMPLATE_VARS, TEMPLATE_SNIPPETS, DEFAULT_TEMPLATES } from "../lib/data";
+import { TEMPLATE_VARS, TEMPLATE_SNIPPETS, DEFAULT_TEMPLATES, type RoomDef } from "../lib/data";
 import { useStore } from "../lib/store";
 import { log } from "../lib/logger";
 import {
@@ -20,7 +20,8 @@ interface Props {
 }
 
 export function TemplateManager({ onClose, onToast }: Props) {
-  const { getTemplate, saveTemplate, resetTemplate, applyTemplateToDoc } = useStore();
+  const { rooms, getTemplate, saveTemplate, resetTemplate, applyTemplateToDoc } = useStore();
+  const ROOMS: RoomDef[] = rooms;
   const [activeId, setActiveId] = useState(ROOMS[0].id);
   const [drafts, setDrafts] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};

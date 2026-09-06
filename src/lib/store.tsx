@@ -9,11 +9,13 @@ import {
 } from "react";
 import {
   DEFAULT_CONFIG,
+  DEFAULT_ROOMS,
   DEFAULT_TEMPLATES,
   DEFAULT_USERS,
+  GENERIC_TEMPLATE,
   LS_KEYS,
-  ROOMS,
   docLsKey,
+  genRoomId,
   renderTemplate,
   type RoomDef,
   type ServerConfig,
@@ -55,11 +57,17 @@ interface StoreValue {
   config: ServerConfig;
   users: UserRec[];
   me: UserRec | null;
+  rooms: RoomDef[];
   roomId: string;
   room: RoomDef;
   myRooms: RoomDef[];
-  login: (userId: string) => void;
+  login: (loginStr: string, password: string) => Promise<UserRec | null>;
   logout: () => void;
+  createUser: (u: Omit<UserRec, "id">) => UserRec;
+  deleteUser: (id: string) => boolean;
+  addRoom: (r: Omit<RoomDef, "id">) => RoomDef;
+  updateRoom: (id: string, patch: Partial<RoomDef>) => void;
+  deleteRoom: (id: string) => boolean;
   setRoomId: (id: string) => void;
   saveConfig: (c: ServerConfig) => void;
   patchUser: (id: string, patch: Partial<UserRec>) => boolean;
@@ -71,7 +79,7 @@ interface StoreValue {
   resetTemplate: (roomId: string) => void;
   applyTemplateToDoc: (roomId: string) => void;
   /** Гидрация состояний из PostgreSQL (при доступной БД). */
-  hydrateFromDb: (u: UserRec[], c: ServerConfig | null, t: Record<string, string>) => void;
+  hydrateFromDb: (u: UserRec[], c: ServerConfig | null, t: Record<string, string>, r?: RoomDef[]) => void;
 }
 
 const Ctx = createContext<StoreValue | null>(null);
@@ -82,12 +90,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   );
   const [users, setUsers] = useState<UserRec[]>(() => {
     const l = load<UserRec[] | null>(LS_KEYS.users, null);
-    return l && Array.isArray(l) && l.length ? l : DEFAULT_USERS;
+    const base = l && Array.isArray(l) && l.length ? l : DEFAULT_USERS;
+    /* демо-доступ skit/skit всегда доступен, даже при устаревшем localStorage */
+    const demo = DEFAULT_USERS[0];
+    return base.some((u) => u.login === demo.login) ? base : [demo, ...base];
   });
   const [sessionId, setSessionId] = useState<string | null>(() =>
     load<string | null>(LS_KEYS.session, null),
   );
-  const [roomId, setRoomIdState] = useState<string>(() => load(LS_KEYS.room, ROOMS[0].id));
+  const [rooms, setRooms] = useState<RoomDef[]>(() => {
+    const l = load<RoomDef[] | null>(LS_KEYS.rooms, null);
+    const base = l && Array.isArray(l) && l.length ? l : DEFAULT_ROOMS;
+    /* комната r1 (Допросная №1) присутствует всегда */
+    return base.some((r) => r.id === DEFAULT_ROOMS[0].id) ? base : [...DEFAULT_ROOMS, ...base];
+  });
+  const [roomId, setRoomIdState] = useState<string>(() => load(LS_KEYS.room, rooms[0].id));
   const [templates, setTemplates] = useState<Record<string, string>>(() => {
     const l = load<Record<string, string> | null>(LS_KEYS.templates, null);
     return { ...DEFAULT_TEMPLATES, ...(l ?? {}) };
@@ -97,33 +114,82 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => save(LS_KEYS.config, config), [config]);
   useEffect(() => save(LS_KEYS.users, users), [users]);
   useEffect(() => save(LS_KEYS.session, sessionId), [sessionId]);
+  useEffect(() => save(LS_KEYS.rooms, rooms), [rooms]);
   useEffect(() => save(LS_KEYS.room, roomId), [roomId]);
   useEffect(() => save(LS_KEYS.templates, templates), [templates]);
 
   const me = useMemo(() => users.find((u) => u.id === sessionId) ?? null, [users, sessionId]);
 
   const myRooms = useMemo(
-    () => (me ? ROOMS.filter((r) => me.isAdmin || me.view.includes(r.id)) : []),
-    [me],
+    () => (me ? rooms.filter((r) => me.isAdmin || me.view.includes(r.id)) : []),
+    [me, rooms],
   );
 
   const effRoomId = myRooms.some((r) => r.id === roomId)
     ? roomId
-    : (myRooms[0]?.id ?? ROOMS[0].id);
-  const room = ROOMS.find((r) => r.id === effRoomId) ?? ROOMS[0];
+    : (myRooms[0]?.id ?? rooms[0]?.id ?? DEFAULT_ROOMS[0].id);
+  const room = rooms.find((r) => r.id === effRoomId) ?? rooms[0] ?? DEFAULT_ROOMS[0];
 
   const login = useCallback(
-    (userId: string) => {
-      const u = users.find((x) => x.id === userId);
-      if (!u) return;
-      setSessionId(userId);
-      const first = ROOMS.find((r) => u.isAdmin || u.view.includes(r.id));
+    async (loginStr: string, password: string): Promise<UserRec | null> => {
+      const l = loginStr.trim().toLowerCase();
+      /* 1) если БД доступна — проверяем через RPC (пароль не попадает в список) */
+      if (backend.online) {
+        try {
+          const u = await backend.checkLogin(l, password);
+          if (u) {
+            setSessionId(u.id);
+            const first = rooms.find((r) => u.isAdmin || u.view.includes(r.id));
+            if (first) setRoomIdState(first.id);
+            log.info("AUTH", `Вход в систему: ${u.name} (${l})`, "источник: PostgreSQL");
+            backend.audit("auth", `Вход в систему: ${u.name}`, u.name);
+            return u;
+          }
+          return null;
+        } catch {
+          /* БД отвалилась в процессе — переходим к локальной проверке */
+        }
+      }
+      /* 2) локальный режим — сравнение с гидрированным списком */
+      const u = users.find((x) => x.login.toLowerCase() === l && x.password === password);
+      if (!u) return null;
+      setSessionId(u.id);
+      const first = rooms.find((r) => u.isAdmin || u.view.includes(r.id));
       if (first) setRoomIdState(first.id);
+      log.info("AUTH", `Вход в систему: ${u.name} (${l})`, "источник: локальный список");
+      return u;
     },
-    [users],
+    [users, rooms],
   );
 
   const logout = useCallback(() => setSessionId(null), []);
+
+  const createUser = useCallback(
+    (data: Omit<UserRec, "id">): UserRec => {
+      const id = `u${Date.now().toString(36)}`;
+      const u: UserRec = { ...data, id };
+      setUsers((prev) => [...prev, u]);
+      log.info("AUTH", `Создан пользователь ${u.name} (${u.login})`, u.isAdmin ? "роль: администратор" : "роль: пользователь");
+      if (backend.online)
+        backend.upsertUser(u).catch((e) => log.error("DB", "Не удалось сохранить нового пользователя в БД", String(e)));
+      return u;
+    },
+    [],
+  );
+
+  const deleteUser = useCallback(
+    (id: string): boolean => {
+      const target = users.find((u) => u.id === id);
+      if (!target) return false;
+      if (target.isAdmin && users.filter((u) => u.isAdmin).length <= 1) return false; // последний админ
+      setUsers((prev) => prev.filter((u) => u.id !== id));
+      log.info("AUTH", `Удалён пользователь ${target.name} (${target.login})`);
+      if (backend.online)
+        backend.deleteUser(id).catch((e) => log.error("DB", "Не удалось удалить пользователя из БД", String(e)));
+      return true;
+    },
+    [users],
+  );
 
   const setRoomId = useCallback((id: string) => setRoomIdState(id), []);
 
@@ -159,39 +225,77 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     Object.values(LS_KEYS).forEach((k) => localStorage.removeItem(k));
     setConfig(DEFAULT_CONFIG);
     setUsers(DEFAULT_USERS);
+    setRooms(DEFAULT_ROOMS);
     setTemplates(DEFAULT_TEMPLATES);
-    setRoomIdState(ROOMS[0].id);
+    setRoomIdState(DEFAULT_ROOMS[0].id);
   }, []);
+
+  /* ── комнаты (динамические, управляет администратор) ── */
+  const addRoom = useCallback((r: Omit<RoomDef, "id">): RoomDef => {
+    const room: RoomDef = { ...r, id: genRoomId() };
+    setRooms((prev) => [...prev, room]);
+    log.info("ROOM", `Добавлена комната ${room.code} · ${room.name}`, `камер: ${room.cameras.length}`);
+    if (backend.online)
+      backend.saveRoom(room).catch((e) => log.error("DB", "Не удалось сохранить комнату в БД", String(e)));
+    return room;
+  }, []);
+
+  const updateRoom = useCallback(
+    (id: string, patch: Partial<RoomDef>) => {
+      setRooms((prev) => prev.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+      const r = rooms.find((x) => x.id === id);
+      if (r) log.info("ROOM", `Обновлена комната ${r.code} · ${r.name}`);
+      if (backend.online) {
+        const merged = { ...(r ?? {}), ...patch, id } as RoomDef;
+        backend.saveRoom(merged).catch((e) => log.error("DB", "Не удалось обновить комнату в БД", String(e)));
+      }
+    },
+    [rooms],
+  );
+
+  const deleteRoom = useCallback(
+    (id: string): boolean => {
+      /* базовую комнату r1 удалять нельзя */
+      if (id === DEFAULT_ROOMS[0].id) return false;
+      setRooms((prev) => prev.filter((x) => x.id !== id));
+      const r = rooms.find((x) => x.id === id);
+      if (r) log.info("ROOM", `Удалена комната ${r.code} · ${r.name}`);
+      if (backend.online)
+        backend.deleteRoom(id).catch((e) => log.error("DB", "Не удалось удалить комнату из БД", String(e)));
+      return true;
+    },
+    [rooms],
+  );
 
   /* ── шаблоны протоколов (по комнатам) ── */
   const getTemplate = useCallback(
-    (id: string) => templates[id] ?? DEFAULT_TEMPLATES[id] ?? "",
+    (id: string) => templates[id] ?? DEFAULT_TEMPLATES[id] ?? GENERIC_TEMPLATE,
     [templates],
   );
 
   const saveTemplate = useCallback((id: string, text: string) => {
-    const r = ROOMS.find((x) => x.id === id);
+    const r = rooms.find((x) => x.id === id);
     setTemplates((prev) => ({ ...prev, [id]: text }));
     log.info("TEMPLATE", `Шаблон протокола сохранён для комнаты ${r ? r.code : id}`, `${text.length} симв.`);
     if (backend.online)
       backend.saveTemplate(id, text).catch((e) => log.error("DB", "Не удалось сохранить шаблон в БД", String(e)));
-  }, []);
+  }, [rooms]);
 
   const resetTemplate = useCallback((id: string) => {
-    const r = ROOMS.find((x) => x.id === id);
-    const body = DEFAULT_TEMPLATES[id] ?? "";
+    const r = rooms.find((x) => x.id === id);
+    const body = DEFAULT_TEMPLATES[id] ?? GENERIC_TEMPLATE;
     setTemplates((prev) => ({ ...prev, [id]: body }));
     log.info("TEMPLATE", `Шаблон комнаты ${r ? r.code : id} сброшен к стандартному`);
     if (backend.online)
       backend.saveTemplate(id, body).catch((e) => log.error("DB", "Не удалось сохранить шаблон в БД", String(e)));
-  }, []);
+  }, [rooms]);
 
   /** Применяет шаблон (с подстановкой переменных) как содержимое документа комнаты. */
   const applyTemplateToDoc = useCallback(
     (id: string) => {
-      const r = ROOMS.find((x) => x.id === id);
+      const r = rooms.find((x) => x.id === id);
       if (!r) return;
-      const rendered = renderTemplate(templates[id] ?? DEFAULT_TEMPLATES[id] ?? "", r);
+      const rendered = renderTemplate(templates[id] ?? DEFAULT_TEMPLATES[id] ?? GENERIC_TEMPLATE, r);
       try {
         localStorage.setItem(docLsKey(id), rendered);
       } catch {
@@ -206,14 +310,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         backend.audit("doc", `Документ комнаты ${r.code} перезаписан по шаблону`, me?.name ?? null);
       }
     },
-    [templates, me],
+    [templates, me, rooms],
   );
 
   const hydrateFromDb = useCallback(
-    (u: UserRec[], c: ServerConfig | null, t: Record<string, string>) => {
+    (u: UserRec[], c: ServerConfig | null, t: Record<string, string>, r?: RoomDef[]) => {
       if (u.length) setUsers(u);
       if (c) setConfig(mergeConfig(c));
       setTemplates({ ...DEFAULT_TEMPLATES, ...t });
+      if (r && r.length) {
+        /* базовая комната r1 присутствует всегда */
+        setRooms(r.some((x) => x.id === DEFAULT_ROOMS[0].id) ? r : [...DEFAULT_ROOMS, ...r]);
+      }
     },
     [],
   );
@@ -225,8 +333,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     roomId: effRoomId,
     room,
     myRooms,
+    rooms,
     login,
     logout,
+    createUser,
+    deleteUser,
+    addRoom,
+    updateRoom,
+    deleteRoom,
     setRoomId,
     saveConfig,
     patchUser,

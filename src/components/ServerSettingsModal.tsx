@@ -218,7 +218,7 @@ export function ServerSettingsModal({ onClose, onToast, onEvent }: Props) {
       !form.macroscop.enabled ? "MACROSCOP" : "",
       !form.mumble.enabled ? "Mumble" : "",
       !form.onlyoffice.enabled ? "ONLYOFFICE" : "",
-      !form.backend.enabled ? "БД (PostgreSQL)" : "",
+      !form.backend.enabled ? "RT-DB" : "",
     ].filter(Boolean);
     onEvent("sys", "Конфигурация серверов обновлена администратором");
     if (off.length) onEvent("sys", `Отключены серверы: ${off.join(", ")}`);
@@ -250,7 +250,7 @@ export function ServerSettingsModal({ onClose, onToast, onEvent }: Props) {
           {/* ── MACROSCOP ── */}
           <Section
             icon={<IcCam className="h-4 w-4" />}
-            title="MACROSCOP · VMS"
+            title="RT-VIDEO · VMS"
             note="видеосервер допросных комнат"
             tone="text-hud"
             enabled={form.macroscop.enabled}
@@ -304,7 +304,7 @@ export function ServerSettingsModal({ onClose, onToast, onEvent }: Props) {
           {/* ── MUMBLE ── */}
           <Section
             icon={<IcRadio className="h-4 w-4" />}
-            title="MUMBLE · АУДИОСЕРВЕР"
+            title="RT-AUDIO · АУДИОСЕРВЕР"
             note="голосовые каналы «Допросная» и «Наблюдатели»"
             tone="text-amber"
             enabled={form.mumble.enabled}
@@ -365,7 +365,7 @@ export function ServerSettingsModal({ onClose, onToast, onEvent }: Props) {
           {/* ── ONLYOFFICE ── */}
           <Section
             icon={<IcFile className="h-4 w-4" />}
-            title="ONLYOFFICE DOCS"
+            title="RT-DOCS · DOCS"
             note="сервер совместного редактирования протоколов"
             tone="text-live"
             enabled={form.onlyoffice.enabled}
@@ -413,10 +413,10 @@ export function ServerSettingsModal({ onClose, onToast, onEvent }: Props) {
             </div>
           </Section>
 
-          {/* ── ДАННЫЕ · POSTGRESQL ── */}
+          {/* ── RT-DB · POSTGRESQL ── */}
           <Section
             icon={<IcDb className="h-4 w-4" />}
-            title="ДАННЫЕ · POSTGRESQL"
+            title="RT-DB · POSTGRESQL"
             note="PostgREST API: пользователи, права, шаблоны, протоколы, аудит"
             tone="text-violet"
             enabled={form.backend.enabled}
