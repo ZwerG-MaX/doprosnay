@@ -52,6 +52,7 @@ export interface ServerConfig {
   macroscop: { host: string; port: number; proto: "rtsp" | "https"; enabled: boolean };
   mumble: { host: string; port: number; enabled: boolean; webUrl: string };
   onlyoffice: { dsUrl: string; jwt: string; docUrl: string; enabled: boolean };
+  backend: { enabled: boolean; apiUrl: string };
 }
 
 /* ── источники видеопотоков ───────────────────────── */
@@ -130,6 +131,7 @@ export const DEFAULT_CONFIG: ServerConfig = {
     docUrl: "https://nas-2.rt-cloud.local/docs/protokol-doprosa.docx",
     enabled: true,
   },
+  backend: { enabled: true, apiUrl: "http://api.local" },
 };
 
 export const LS_KEYS = {

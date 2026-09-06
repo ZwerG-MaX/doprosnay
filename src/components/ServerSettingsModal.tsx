@@ -4,7 +4,7 @@ import { DEFAULT_CONFIG, type ServerConfig } from "../lib/data";
 import { useStore } from "../lib/store";
 import { loadDocsApi, apiScriptUrl } from "../lib/onlyoffice";
 import { randInt } from "../lib/hooks";
-import { IcCam, IcRadio, IcFile, IcClose, IcSignal, IcGear } from "./Icons";
+import { IcCam, IcRadio, IcFile, IcClose, IcSignal, IcGear, IcDb } from "./Icons";
 
 interface Props {
   onClose: () => void;
@@ -135,6 +135,7 @@ export function ServerSettingsModal({ onClose, onToast, onEvent }: Props) {
   const [diagMs, setDiagMs] = useState<Diag>({ st: "idle" });
   const [diagMu, setDiagMu] = useState<Diag>({ st: "idle" });
   const [diagOo, setDiagOo] = useState<Diag>({ st: "idle" });
+  const [diagDb, setDiagDb] = useState<Diag>({ st: "idle" });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -148,11 +149,14 @@ export function ServerSettingsModal({ onClose, onToast, onEvent }: Props) {
     setForm((f) => ({ ...f, mumble: { ...f.mumble, ...patch } }));
   const setOo = (patch: Partial<ServerConfig["onlyoffice"]>) =>
     setForm((f) => ({ ...f, onlyoffice: { ...f.onlyoffice, ...patch } }));
+  const setBk = (patch: Partial<ServerConfig["backend"]>) =>
+    setForm((f) => ({ ...f, backend: { ...f.backend, ...patch } }));
 
   /* сброс диагностики при изменении параметров */
   const touchMs = () => setDiagMs({ st: "idle" });
   const touchMu = () => setDiagMu({ st: "idle" });
   const touchOo = () => setDiagOo({ st: "idle" });
+  const touchDb = () => setDiagDb({ st: "idle" });
 
   const validHost = (h: string) => h.trim().length >= 3;
   const validPort = (p: number) => Number.isFinite(p) && p > 0 && p < 65536;
@@ -190,12 +194,31 @@ export function ServerSettingsModal({ onClose, onToast, onEvent }: Props) {
     }
   };
 
+  /* реальная проверка PostgreSQL (PostgREST): запрос списка пользователей */
+  const checkDb = async () => {
+    setDiagDb({ st: "checking" });
+    const t0 = performance.now();
+    try {
+      const url = form.backend.apiUrl.trim().replace(/\/+$/, "");
+      if (!url) throw new Error("адрес не указан");
+      const res = await fetch(`${url}/users?select=id&limit=1`, {
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const ms = Math.round(performance.now() - t0);
+      setDiagDb({ st: "ok", ms });
+    } catch (e) {
+      setDiagDb({ st: "fail", note: e instanceof Error ? e.message : "нет ответа" });
+    }
+  };
+
   const apply = () => {
     saveConfig(form);
     const off = [
       !form.macroscop.enabled ? "MACROSCOP" : "",
       !form.mumble.enabled ? "Mumble" : "",
       !form.onlyoffice.enabled ? "ONLYOFFICE" : "",
+      !form.backend.enabled ? "БД (PostgreSQL)" : "",
     ].filter(Boolean);
     onEvent("sys", "Конфигурация серверов обновлена администратором");
     if (off.length) onEvent("sys", `Отключены серверы: ${off.join(", ")}`);
@@ -387,6 +410,42 @@ export function ServerSettingsModal({ onClose, onToast, onEvent }: Props) {
                   {apiScriptUrl(form.onlyoffice.dsUrl || "…")}
                 </span>
               </div>
+            </div>
+          </Section>
+
+          {/* ── ДАННЫЕ · POSTGRESQL ── */}
+          <Section
+            icon={<IcDb className="h-4 w-4" />}
+            title="ДАННЫЕ · POSTGRESQL"
+            note="PostgREST API: пользователи, права, шаблоны, протоколы, аудит"
+            tone="text-violet"
+            enabled={form.backend.enabled}
+            onToggle={(v) => {
+              setBk({ enabled: v });
+              touchDb();
+            }}
+          >
+            <div className="space-y-2">
+              <Field label="АДРЕС API (POSTGREST)">
+                <input
+                  className={inp}
+                  value={form.backend.apiUrl}
+                  onChange={(e) => {
+                    setBk({ apiUrl: e.target.value });
+                    touchDb();
+                  }}
+                  placeholder="http://api.local"
+                />
+              </Field>
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <DiagButton diag={diagDb} onCheck={checkDb} disabled={!form.backend.enabled} />
+                <span className="truncate font-mono text-[9.5px] text-faint">
+                  {form.backend.apiUrl.replace(/\/+$/, "")}/users · /templates · /documents · /audit_log
+                </span>
+              </div>
+              <p className="font-mono text-[9px] leading-relaxed text-faint">
+                при недоступной БД пульт автоматически работает в локальном режиме (localStorage)
+              </p>
             </div>
           </Section>
         </div>

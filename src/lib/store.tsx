@@ -20,6 +20,7 @@ import {
   type UserRec,
 } from "./data";
 import { log } from "./logger";
+import { backend } from "./backend";
 
 function load<T>(key: string, fallback: T): T {
   try {
@@ -44,6 +45,7 @@ function mergeConfig(c: Partial<ServerConfig> | null): ServerConfig {
     macroscop: { ...DEFAULT_CONFIG.macroscop, ...c.macroscop },
     mumble: { ...DEFAULT_CONFIG.mumble, ...c.mumble },
     onlyoffice: { ...DEFAULT_CONFIG.onlyoffice, ...c.onlyoffice },
+    backend: { ...DEFAULT_CONFIG.backend, ...c.backend },
   };
 }
 
@@ -68,6 +70,8 @@ interface StoreValue {
   saveTemplate: (roomId: string, text: string) => void;
   resetTemplate: (roomId: string) => void;
   applyTemplateToDoc: (roomId: string) => void;
+  /** Гидрация состояний из PostgreSQL (при доступной БД). */
+  hydrateFromDb: (u: UserRec[], c: ServerConfig | null, t: Record<string, string>) => void;
 }
 
 const Ctx = createContext<StoreValue | null>(null);
@@ -130,6 +134,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       `MACROSCOP=${c.macroscop.host}:${c.macroscop.port}(${c.macroscop.enabled ? "вкл" : "выкл"}) · Mumble=${c.mumble.host}:${c.mumble.port}(${c.mumble.enabled ? "вкл" : "выкл"}) · ONLYOFFICE=${c.onlyoffice.dsUrl}(${c.onlyoffice.enabled ? "вкл" : "выкл"})`,
     );
     setConfig(c);
+    if (backend.online) backend.saveConfig(c).catch((e) => log.error("DB", "Не удалось сохранить конфиг в БД", String(e)));
   }, []);
 
   const patchUser = useCallback(
@@ -141,7 +146,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         const admins = users.filter((u) => u.isAdmin);
         if (admins.length <= 1) return false;
       }
-      setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, ...patch } : u)));
+      const merged = { ...target, ...patch };
+      setUsers((prev) => prev.map((u) => (u.id === id ? merged : u)));
+      if (backend.online)
+        backend.upsertUser(merged).catch((e) => log.error("DB", "Не удалось сохранить пользователя в БД", String(e)));
       return true;
     },
     [users],
@@ -165,12 +173,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const r = ROOMS.find((x) => x.id === id);
     setTemplates((prev) => ({ ...prev, [id]: text }));
     log.info("TEMPLATE", `Шаблон протокола сохранён для комнаты ${r ? r.code : id}`, `${text.length} симв.`);
+    if (backend.online)
+      backend.saveTemplate(id, text).catch((e) => log.error("DB", "Не удалось сохранить шаблон в БД", String(e)));
   }, []);
 
   const resetTemplate = useCallback((id: string) => {
     const r = ROOMS.find((x) => x.id === id);
-    setTemplates((prev) => ({ ...prev, [id]: DEFAULT_TEMPLATES[id] ?? "" }));
+    const body = DEFAULT_TEMPLATES[id] ?? "";
+    setTemplates((prev) => ({ ...prev, [id]: body }));
     log.info("TEMPLATE", `Шаблон комнаты ${r ? r.code : id} сброшен к стандартному`);
+    if (backend.online)
+      backend.saveTemplate(id, body).catch((e) => log.error("DB", "Не удалось сохранить шаблон в БД", String(e)));
   }, []);
 
   /** Применяет шаблон (с подстановкой переменных) как содержимое документа комнаты. */
@@ -186,8 +199,23 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       setTemplateTick((t) => t + 1);
       log.info("TEMPLATE", `Шаблон применён к документу комнаты ${r.code}`, "документ перезаписан");
+      if (backend.online) {
+        backend.saveDocument(id, rendered, me?.name ?? null, 1).catch((e) =>
+          log.error("DB", "Не удалось сохранить документ в БД", String(e)),
+        );
+        backend.audit("doc", `Документ комнаты ${r.code} перезаписан по шаблону`, me?.name ?? null);
+      }
     },
-    [templates],
+    [templates, me],
+  );
+
+  const hydrateFromDb = useCallback(
+    (u: UserRec[], c: ServerConfig | null, t: Record<string, string>) => {
+      if (u.length) setUsers(u);
+      if (c) setConfig(mergeConfig(c));
+      setTemplates({ ...DEFAULT_TEMPLATES, ...t });
+    },
+    [],
   );
 
   const value: StoreValue = {
@@ -209,6 +237,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     saveTemplate,
     resetTemplate,
     applyTemplateToDoc,
+    hydrateFromDb,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
