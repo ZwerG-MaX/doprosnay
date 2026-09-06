@@ -21,10 +21,10 @@ export function Panel({
 }: PanelProps) {
   return (
     <section
-      className={`rise flex min-h-0 flex-col rounded-xl border border-line bg-panel/90 shadow-[0_16px_40px_rgba(3,8,22,0.55)] ${className}`}
+      className={`rise flex min-h-0 flex-col rounded-rt-m border border-line bg-panel/90 shadow-rt-2 transition-shadow duration-200 hover:shadow-rt-3 ${className}`}
       style={{ animationDelay: `${delay}ms` }}
     >
-      <header className="flex h-11 shrink-0 items-center gap-2.5 rounded-t-xl border-b border-line bg-panel2/80 px-3.5">
+      <header className="flex h-11 shrink-0 items-center gap-2.5 rounded-t-rt-m border-b border-line bg-panel2/80 px-3.5">
         <span className={`led ${ledClass}`} />
         <h2 className="shrink-0 font-display text-[11.5px] tracking-[0.18em] text-fg">{title}</h2>
         {sub && (

@@ -42,7 +42,7 @@ export function AudioConsole({ baseUrl, username, channel, roomLabel, onClose }:
 
   return createPortal(
     <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/85 p-2 md:p-4">
-      <div className="rise relative flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-line2 bg-panel shadow-[0_30px_100px_rgba(0,0,0,0.7)]">
+      <div className="rise relative flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-rt-l border border-line2 bg-panel shadow-rt-4">
         {/* шапка консоли */}
         <header className="flex h-12 shrink-0 items-center gap-2.5 border-b border-line bg-panel2/70 px-4">
           <IcRadio className="h-4.5 w-4.5 text-amber" />

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNow, useInterval, fmtClock, fmtDate, fmtDur, randInt } from "../lib/hooks";
 import { useStore, mumbleUrlOf } from "../lib/store";
 import type { DbStatus } from "../lib/backend";
+import { initialsOf } from "../lib/data";
 import { RtMark, IcGear, IcUsers, IcLogout, IcShield, IcFile, IcTemplate, IcRooms } from "./Icons";
 
 interface Props {
@@ -26,21 +27,21 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
       <div className="flex min-w-0 items-center gap-2.5">
         <RtMark className="h-7 w-7 shrink-0" />
         <div className="min-w-0 leading-tight">
-          <div className="font-display text-[12px] uppercase tracking-[0.14em] text-fg">
+          <div className="heading-h5 font-display uppercase tracking-[0.14em] text-fg">
             <span className="rt-grad-text">СКИТ</span>{" "}
             <span className="hidden text-dim sm:inline">· Допросная</span>
           </div>
-          <div className="truncate font-mono text-[9px] tracking-wider text-faint">
+          <div className="description-m truncate font-mono text-faint">
             {room.code} · {room.name.toUpperCase()}
           </div>
         </div>
       </div>
 
       <div className="mx-auto hidden flex-col items-center leading-none lg:flex">
-        <span className="font-mono text-[22px] font-semibold tracking-widest text-fg tabular-nums">
+        <span className="font-mono text-[22px] font-bold tracking-widest text-fg tabular-nums">
           {fmtClock(now)}
         </span>
-        <span className="mt-1 font-mono text-[9.5px] tracking-[0.22em] text-faint">
+        <span className="description-s mt-1 font-mono tracking-[0.22em] text-faint">
           {fmtDate(now)} · СМЕНА Б · ПОСТ 7
         </span>
       </div>
@@ -123,7 +124,7 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
             className="grid h-6 w-6 place-items-center rounded-full font-display text-[9px] font-bold text-ink"
             style={{ background: me?.color }}
           >
-            {me?.name.slice(0, 2).toUpperCase()}
+            {me ? initialsOf(me.name) : "—"}
           </span>
           <span className="hidden flex-col leading-none md:flex">
             <span className="max-w-[120px] truncate text-[11px] font-semibold text-fg">{me?.name}</span>

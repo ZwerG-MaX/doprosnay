@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { type RoomDef, type UserRec } from "../lib/data";
+import { type RoomDef, type UserRec, initialsOf, shortName } from "../lib/data";
 import { useStore } from "../lib/store";
 import { IcUsers, IcClose, IcEye, IcPen, IcShield, IcPlus, IcTrash, IcChevR } from "./Icons";
 
@@ -48,7 +48,7 @@ export function AccessManager({ onClose, onToast }: Props) {
   const submitForm = () => {
     const login = form.login.trim().toLowerCase();
     if (!form.name.trim() || !login || !form.password) {
-      setFormErr("Заполните имя, логин и пароль");
+      setFormErr("Заполните ФИО, логин и пароль");
       return;
     }
     if (users.some((u) => u.login.toLowerCase() === login)) {
@@ -71,7 +71,20 @@ export function AccessManager({ onClose, onToast }: Props) {
     setFormOpen(false);
   };
 
+  /* двухшаговое подтверждение удаления */
+  const [armedDelete, setArmedDelete] = useState<string | null>(null);
+  const armedTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(armedTimer.current), []);
+
+  const armDelete = (id: string) => {
+    setArmedDelete(id);
+    window.clearTimeout(armedTimer.current);
+    armedTimer.current = window.setTimeout(() => setArmedDelete(null), 3200);
+  };
+
   const removeUser = (u: UserRec) => {
+    window.clearTimeout(armedTimer.current);
+    setArmedDelete(null);
     if (u.id === me?.id) {
       onToast("Нельзя удалить собственную учётную запись");
       return;
@@ -81,7 +94,7 @@ export function AccessManager({ onClose, onToast }: Props) {
       onToast("Нельзя удалить последнего администратора");
       return;
     }
-    onToast(`Пользователь ${u.name} удалён`);
+    onToast(`Пользователь ${shortName(u.name)} удалён из системы`);
   };
 
   const toggleIn = (list: string[], id: string) =>
@@ -127,7 +140,7 @@ export function AccessManager({ onClose, onToast }: Props) {
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 md:p-6">
       <div className="absolute inset-0 bg-black/75 backdrop-blur-[3px]" onClick={onClose} />
-      <div className="rise relative flex max-h-full w-full max-w-[780px] flex-col overflow-hidden rounded-xl border border-line2 bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.6)]">
+      <div className="rise relative flex max-h-full w-full max-w-[780px] flex-col overflow-hidden rounded-rt-l border border-line2 bg-panel shadow-rt-4">
         <header className="flex h-12 shrink-0 items-center gap-2.5 border-b border-line bg-panel2/70 px-4">
           <IcUsers className="h-4.5 w-4.5 text-hud" />
           <h2 className="font-display text-[12px] tracking-[0.18em] text-fg">УПРАВЛЕНИЕ ДОСТУПОМ</h2>
@@ -155,13 +168,22 @@ export function AccessManager({ onClose, onToast }: Props) {
 
           {formOpen && (
             <div className="mt-2.5 space-y-2.5 pb-1">
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-                <label className="block">
-                  <span className="mb-1 block font-mono text-[9px] tracking-[0.18em] text-faint">ИМЯ *</span>
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
+                <label className="block md:col-span-2 xl:col-span-1">
+                  <span className="mb-1 block font-mono text-[9px] tracking-[0.18em] text-faint">ФИО ПОЛНОСТЬЮ *</span>
                   <input
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="Фамилия"
+                    placeholder="Иванов Иван Иванович"
+                    className="h-8 w-full rounded-md border border-line bg-panel px-2.5 font-mono text-[12px] text-fg outline-none focus:border-hud/70"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block font-mono text-[9px] tracking-[0.18em] text-faint">СПЕЦИАЛЬНОСТЬ</span>
+                  <input
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                    placeholder="специалист"
                     className="h-8 w-full rounded-md border border-line bg-panel px-2.5 font-mono text-[12px] text-fg outline-none focus:border-hud/70"
                   />
                 </label>
@@ -304,7 +326,7 @@ export function AccessManager({ onClose, onToast }: Props) {
                           className="grid h-7 w-7 shrink-0 place-items-center rounded-full font-display text-[10px] font-bold text-ink"
                           style={{ background: u.color }}
                         >
-                          {u.name.slice(0, 2).toUpperCase()}
+                          {initialsOf(u.name)}
                         </span>
                         <div className="min-w-0">
                           <div className="truncate text-[12px] font-semibold text-fg">
@@ -316,12 +338,23 @@ export function AccessManager({ onClose, onToast }: Props) {
                           </div>
                         </div>
                         <button
-                          onClick={() => removeUser(u)}
-                          title={isMe ? "Нельзя удалить себя" : `Удалить ${u.name}`}
+                          onClick={() => (armedDelete === u.id ? removeUser(u) : armDelete(u.id))}
+                          title={
+                            isMe
+                              ? "Нельзя удалить себя"
+                              : armedDelete === u.id
+                                ? "Нажмите ещё раз для удаления"
+                                : `Удалить ${shortName(u.name)}`
+                          }
                           disabled={isMe}
-                          className={`ml-auto grid h-7 w-7 shrink-0 place-items-center rounded-md border border-line bg-panel text-faint opacity-0 transition-all group-hover:opacity-100 hover:border-rec/60 hover:text-rec active:scale-90 disabled:cursor-not-allowed disabled:hover:border-line disabled:hover:text-faint`}
+                          className={`ml-auto flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-1.5 font-mono text-[9px] tracking-widest transition-all active:scale-90 disabled:cursor-not-allowed ${
+                            armedDelete === u.id
+                              ? "border-rec bg-rec/20 text-rec shadow-[0_0_14px_rgba(255,77,94,0.35)]"
+                              : "border-line bg-panel text-faint hover:border-rec/60 hover:text-rec"
+                          }`}
                         >
-                          <IcTrash className="h-3.5 w-3.5" />
+                          <IcTrash className="h-3.5 w-3.5 shrink-0" />
+                          {armedDelete === u.id && <span className="pr-0.5">УДАЛИТЬ?</span>}
                         </button>
                       </div>
                     </td>
@@ -388,6 +421,7 @@ export function AccessManager({ onClose, onToast }: Props) {
             <span className="flex items-center gap-1.5"><IcEye className="h-3 w-3 text-hud" /> просмотр комнаты (видеостена + аудио)</span>
             <span className="flex items-center gap-1.5"><IcPen className="h-3 w-3 text-live" /> совместное редактирование протокола</span>
             <span className="flex items-center gap-1.5"><IcShield className="h-3 w-3 text-violet" /> администратор: серверы + доступы</span>
+            <span className="flex items-center gap-1.5"><IcTrash className="h-3 w-3 text-rec" /> удаление — два клика (подтверждение)</span>
           </p>
         </div>
 

@@ -258,6 +258,24 @@ export const GENERIC_TEMPLATE = `ПРОТОКОЛ НАБЛЮДЕНИЯ
 
 const p2 = (n: number) => String(n).padStart(2, "0");
 
+/** «Соколов Андрей Викторович» → «Соколов А. В.» (для отображения в комнатах). */
+export function shortName(full: string): string {
+  const parts = full.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return full;
+  const [surname, ...rest] = parts;
+  const inits = rest.map((w) => `${w[0].toUpperCase()}.`).join(" ");
+  return inits ? `${surname} ${inits}` : surname;
+}
+
+/** «Соколов Андрей Викторович» → «СА» (инициалы для аватара). */
+export function initialsOf(full: string): string {
+  const parts = full.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "??";
+  const first = parts[0][0] ?? "";
+  const second = parts[1]?.[0] ?? "";
+  return (first + second).toUpperCase();
+}
+
 /** Подставляет переменные ({ДАТА}, {ВРЕМЯ}, …) в шаблон для конкретной комнаты. */
 export function renderTemplate(tpl: string, room: RoomDef): string {
   const d = new Date();
