@@ -133,7 +133,7 @@ export function LoginScreen() {
                     className="grid h-8 w-8 shrink-0 place-items-center rounded-full font-display text-[11px] font-bold text-ink"
                     style={{ background: u.color }}
                   >
-                    {u.name.replace(/^(майор|капитан|ст\. л-т)\s+/i, "").slice(0, 2).toUpperCase()}
+                    {u.name.slice(0, 2).toUpperCase()}
                   </span>
                   <span className="min-w-0">
                     <span className="block truncate text-[13px] font-semibold text-fg">{u.name}</span>

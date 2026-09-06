@@ -82,7 +82,7 @@ export function StatusBar({ sessionStart, onOpenServers, onOpenAccess, onOpenTem
             className="grid h-6 w-6 place-items-center rounded-full font-display text-[9px] font-bold text-ink"
             style={{ background: me?.color }}
           >
-            {me?.name.replace(/^(майор|капитан|ст\. л-т)\s+/i, "").slice(0, 2).toUpperCase()}
+            {me?.name.slice(0, 2).toUpperCase()}
           </span>
           <span className="hidden flex-col leading-none md:flex">
             <span className="max-w-[120px] truncate text-[11px] font-semibold text-fg">{me?.name}</span>
