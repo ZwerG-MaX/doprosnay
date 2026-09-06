@@ -184,11 +184,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       if (target.isAdmin && users.filter((u) => u.isAdmin).length <= 1) return false; // последний админ
       setUsers((prev) => prev.filter((u) => u.id !== id));
       log.info("AUTH", `Удалён пользователь ${target.name} (${target.login})`);
-      if (backend.online)
+      if (backend.online) {
         backend.deleteUser(id).catch((e) => log.error("DB", "Не удалось удалить пользователя из БД", String(e)));
+        backend.audit("auth", `Удалён пользователь ${target.name} (${target.login})`, me?.name ?? null);
+      }
       return true;
     },
-    [users],
+    [users, me],
   );
 
   const setRoomId = useCallback((id: string) => setRoomIdState(id), []);

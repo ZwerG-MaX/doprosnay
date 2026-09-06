@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { type RoomDef, type UserRec, initialsOf, shortName } from "../lib/data";
 import { useStore } from "../lib/store";
@@ -71,7 +71,20 @@ export function AccessManager({ onClose, onToast }: Props) {
     setFormOpen(false);
   };
 
+  /* двухшаговое подтверждение удаления */
+  const [armedDelete, setArmedDelete] = useState<string | null>(null);
+  const armedTimer = useRef(0);
+  useEffect(() => () => window.clearTimeout(armedTimer.current), []);
+
+  const armDelete = (id: string) => {
+    setArmedDelete(id);
+    window.clearTimeout(armedTimer.current);
+    armedTimer.current = window.setTimeout(() => setArmedDelete(null), 3200);
+  };
+
   const removeUser = (u: UserRec) => {
+    window.clearTimeout(armedTimer.current);
+    setArmedDelete(null);
     if (u.id === me?.id) {
       onToast("Нельзя удалить собственную учётную запись");
       return;
@@ -81,7 +94,7 @@ export function AccessManager({ onClose, onToast }: Props) {
       onToast("Нельзя удалить последнего администратора");
       return;
     }
-    onToast(`Пользователь ${u.name} удалён`);
+    onToast(`Пользователь ${shortName(u.name)} удалён из системы`);
   };
 
   const toggleIn = (list: string[], id: string) =>
@@ -325,12 +338,23 @@ export function AccessManager({ onClose, onToast }: Props) {
                           </div>
                         </div>
                         <button
-                          onClick={() => removeUser(u)}
-                          title={isMe ? "Нельзя удалить себя" : `Удалить ${u.name}`}
+                          onClick={() => (armedDelete === u.id ? removeUser(u) : armDelete(u.id))}
+                          title={
+                            isMe
+                              ? "Нельзя удалить себя"
+                              : armedDelete === u.id
+                                ? "Нажмите ещё раз для удаления"
+                                : `Удалить ${shortName(u.name)}`
+                          }
                           disabled={isMe}
-                          className={`ml-auto grid h-7 w-7 shrink-0 place-items-center rounded-md border border-line bg-panel text-faint opacity-0 transition-all group-hover:opacity-100 hover:border-rec/60 hover:text-rec active:scale-90 disabled:cursor-not-allowed disabled:hover:border-line disabled:hover:text-faint`}
+                          className={`ml-auto flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-1.5 font-mono text-[9px] tracking-widest transition-all active:scale-90 disabled:cursor-not-allowed ${
+                            armedDelete === u.id
+                              ? "border-rec bg-rec/20 text-rec shadow-[0_0_14px_rgba(255,77,94,0.35)]"
+                              : "border-line bg-panel text-faint hover:border-rec/60 hover:text-rec"
+                          }`}
                         >
-                          <IcTrash className="h-3.5 w-3.5" />
+                          <IcTrash className="h-3.5 w-3.5 shrink-0" />
+                          {armedDelete === u.id && <span className="pr-0.5">УДАЛИТЬ?</span>}
                         </button>
                       </div>
                     </td>
@@ -397,6 +421,7 @@ export function AccessManager({ onClose, onToast }: Props) {
             <span className="flex items-center gap-1.5"><IcEye className="h-3 w-3 text-hud" /> просмотр комнаты (видеостена + аудио)</span>
             <span className="flex items-center gap-1.5"><IcPen className="h-3 w-3 text-live" /> совместное редактирование протокола</span>
             <span className="flex items-center gap-1.5"><IcShield className="h-3 w-3 text-violet" /> администратор: серверы + доступы</span>
+            <span className="flex items-center gap-1.5"><IcTrash className="h-3 w-3 text-rec" /> удаление — два клика (подтверждение)</span>
           </p>
         </div>
 
