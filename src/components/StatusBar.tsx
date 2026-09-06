@@ -58,10 +58,10 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
             }`}
             title={
               dbStatus.state === "online"
-                ? `PostgreSQL (PostgREST) · ${dbStatus.latencyMs} мс · пользователей в БД: ${dbStatus.userCount}`
+                ? `rt-api · база данных и API · ${dbStatus.latencyMs} мс · пользователей в БД: ${dbStatus.userCount}`
                 : dbStatus.state === "error"
-                  ? `PostgreSQL недоступна: ${dbStatus.error} — локальный режим`
-                  : "PostgreSQL · локальный режим (localStorage)"
+                  ? `rt-api недоступна: ${dbStatus.error} — локальный режим`
+                  : "rt-api · локальный режим (localStorage)"
             }
           >
             <span
@@ -73,7 +73,7 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
                     : "bg-faint"
               }`}
             />
-            PG
+            RT-API
             {dbStatus.state === "online"
               ? `·${dbStatus.latencyMs}мс`
               : dbStatus.state === "error"
@@ -96,7 +96,7 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
               config.macroscop.enabled ? "bg-live shadow-[0_0_7px_rgba(49,217,138,0.9)]" : "bg-faint"
             }`}
           />
-          MACROSCOP{config.macroscop.enabled ? "" : "·ОТКЛ"}
+          RT-VIDEO{config.macroscop.enabled ? "" : "·ОТКЛ"}
         </span>
         <span
           className={`hidden items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] tracking-wider xl:flex ${
@@ -107,7 +107,7 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
           title={`${mumbleUrlOf(config)}${config.mumble.enabled ? "" : " · отключён администратором"}`}
         >
           <span className={`led ${config.mumble.enabled ? "bg-hud shadow-[0_0_7px_rgba(0,176,240,0.9)]" : "bg-faint"}`} />
-          MUMBLE{config.mumble.enabled ? `·${latency}мс` : "·ОТКЛ"}
+          RT-AUDIO{config.mumble.enabled ? `·${latency}мс` : "·ОТКЛ"}
         </span>
         <span className="flex items-center gap-2 rounded-full border border-rec/40 bg-rec/10 px-2.5 py-1">
           <span className="led blink-rec bg-rec shadow-[0_0_8px_rgba(255,77,94,0.9)]" />
@@ -138,7 +138,7 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
           <>
             <button
               onClick={onOpenServers}
-              title="Редактировать подключения к серверам (MACROSCOP · Mumble · ONLYOFFICE)"
+              title="Редактировать подключения к серверам (rt-video · rt-audio · rt-docs · rt-api)"
               className="flex h-8 items-center gap-1.5 rounded-full border border-violet/50 bg-violet/10 px-2.5 text-violet transition-all hover:border-violet hover:bg-violet/20 hover:shadow-[0_0_14px_rgba(122,92,245,0.3)] active:scale-95"
             >
               <IcGear className="h-4 w-4" />
