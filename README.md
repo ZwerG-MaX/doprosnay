@@ -17,6 +17,7 @@ Web-пульт для комнаты наблюдения при допросн�
                  │  docs.local   →  docs      (ONLYOFFICE Document Server)            │
                  │  cloud.local  →  cloud     (Nextcloud, SQLite — хранилище)         │
                  │  mumble.local →  mumble-web (HTML5-аудиоклиент) ⇄ mumble-web-proxy │
+                 │  api.local    →  api (PostgREST) → db (PostgreSQL 16)              │
                  └────────────────────────────────────────────────────────────────────┘
    Mumble  ──►  mumble  :64738 (tcp/udp)  ·  WebRTC-медиа: udp :64737 (mumble-web-proxy)
    Видео   ──►  vms-demo (демо-VMS, RTSP) ─► media (MediaMTX) ─► браузер
@@ -49,7 +50,7 @@ npm run dev          # http://localhost:5173
 1. Пропишите домены (для разработки):
    ```
    # /etc/hosts
-   127.0.0.1  pult.local docs.local cloud.local mumble.local
+   127.0.0.1  pult.local docs.local cloud.local mumble.local api.local
    ```
 2. Поднимите стек:
    ```bash
@@ -60,6 +61,7 @@ npm run dev          # http://localhost:5173
    - **http://docs.local** — ONLYOFFICE Document Server (`/healthcheck` → `true`)
    - **http://cloud.local** — Nextcloud (админ: `admin` / `rt-cloud-2026`)
    - **http://mumble.local** — аудиоконсоль mumble-web (или кнопка «АУДИОКОНСОЛЬ» в пульте)
+   - **http://api.local/users?select=id,name** — PostgreSQL API (PostgREST)
    - **http://localhost:8080** — дашборд Traefik (только dev)
 
 Остановить: `docker compose down` (данные на томах сохраняются).
@@ -104,6 +106,42 @@ Nextcloud поднят в минимальной конфигурации: вс�
 
 Полезно: у Nextcloud есть официальный коннектор ONLYOFFICE — приложение
 `onlyoffice` из каталога Nextcloud, если нужен редактор прямо в интерфейсе облака.
+
+---
+
+## Данные · PostgreSQL
+
+Хранилище — **PostgreSQL 16** + **PostgREST** (автогенерируемый REST API):
+всего два контейнера, схема и сид-данные — `infra/db/init.sql` (выполняется
+автоматически при первом старте тома `db_data`).
+
+| Таблица         | Что хранит                                        |
+|-----------------|---------------------------------------------------|
+| `users`         | участники, роли, цвета, права (view/edit по комнатам) |
+| `server_config` | конфиг MACROSCOP / Mumble / ONLYOFFICE / БД (singleton) |
+| `templates`     | шаблоны протоколов по комнатам                    |
+| `documents`     | содержимое протоколов + ревизия и автор правки    |
+| `audit_log`     | журнал аудита (все события пульта)                |
+
+**Гибридный режим:** при старте пульт обращается к `api.local` (адрес правится
+в «Серверы → Данные · PostgreSQL», там же — живая проверка). Если БД доступна —
+данные читаются из неё, все изменения (права, конфиг, шаблоны, протоколы, аудит)
+пишутся в БД. Если недоступна — пульт прозрачно работает в локальном режиме
+(localStorage), пилюля **PG** в шапке показывает статус:
+`онлайн + задержка` / `ОШИБКА` / `ЛОКАЛ`.
+
+**Проверка:**
+```bash
+curl http://api.local/users?select=id,name     # список участников из БД
+curl http://api.local/templates?select=room_id # шаблоны
+```
+
+**Прод-режим:** сейчас доступ анонимный (роль `pult_anon`, допустимо в закрытой
+сети). Для боевой эксплуатации включите JWT в PostgREST (`PGRST_JWT_SECRET`,
+`db-anon-role` + `SET ROLE` по токену) либо замените связку на **Supabase**
+(тот же PostgreSQL + готовая авторизация и realtime; клиент
+`@supabase/supabase-js` уже есть в зависимостях) — слой `src/lib/backend.ts`
+изолирует доступ к данным, поэтому замена не затронет интерфейс.
 
 ---
 

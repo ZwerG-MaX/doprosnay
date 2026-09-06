@@ -10,6 +10,7 @@ import {
 } from "../lib/onlyoffice";
 import { buildProtocolDocx, docxFilename } from "../lib/docxgen";
 import { downloadBlob, getTemplateFile } from "../lib/filedb";
+import { backend } from "../lib/backend";
 import { Panel } from "./Panel";
 import { IcSignal, IcSave, IcFile, IcPen, IcEye, IcTemplate } from "./Icons";
 
@@ -92,15 +93,35 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
   const observersRef = useRef(observers);
   observersRef.current = observers;
 
-  /* смена комнаты — другой документ (новый создаётся из шаблона комнаты) */
+  const revRef = useRef(0);
+
+  /* смена комнаты — другой документ: сначала локальная копия, затем БД */
   useEffect(() => {
     setDocTitle(room.docTitle);
+    let cancelled = false;
     try {
       setText(localStorage.getItem(docLsKey(room.id)) ?? seedDoc);
     } catch {
       setText(seedDoc);
     }
+    revRef.current = 0;
+    if (backend.online) {
+      backend
+        .fetchDocument(room.id)
+        .then((row) => {
+          if (cancelled) return;
+          if (row) {
+            setText(row.content);
+            revRef.current = row.rev;
+            log.debug("DB", `Протокол комнаты загружен из БД`, `rev=${row.rev} · ${row.content.length} симв.`);
+          }
+        })
+        .catch((e) => log.error("DB", "Не удалось загрузить протокол из БД", String(e)));
+    }
     setSavedAt(fmtClock(new Date()));
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room.id]);
 
@@ -132,6 +153,13 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
       }
       setSaveState("saved");
       setSavedAt(fmtClock(new Date()));
+      /* дублируем в PostgreSQL с инкрементом ревизии */
+      if (backend.online) {
+        revRef.current += 1;
+        backend.saveDocument(room.id, val, me?.name ?? null, revRef.current).catch((e) =>
+          log.error("DB", "Не удалось сохранить протокол в БД", String(e)),
+        );
+      }
     }, 700);
   };
 

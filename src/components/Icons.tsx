@@ -149,6 +149,14 @@ export const IcSignal = ({ className }: IconProps) => (
   </svg>
 );
 
+export const IcDb = ({ className }: IconProps) => (
+  <svg viewBox="0 0 24 24" className={className} {...S}>
+    <ellipse cx="12" cy="5.5" rx="7" ry="2.8" />
+    <path d="M5 5.5v6c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8v-6" />
+    <path d="M5 11.5v6c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8v-6" />
+  </svg>
+);
+
 export const IcChevR = ({ className }: IconProps) => (
   <svg viewBox="0 0 24 24" className={className} {...S}>
     <path d="m9 6 6 6-6 6" />

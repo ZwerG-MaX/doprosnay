@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useNow, useInterval, fmtClock, fmtDate, fmtDur, randInt } from "../lib/hooks";
 import { useStore, mumbleUrlOf } from "../lib/store";
+import type { DbStatus } from "../lib/backend";
 import { RtMark, IcGear, IcUsers, IcLogout, IcShield, IcFile, IcTemplate } from "./Icons";
 
 interface Props {
   sessionStart: number;
+  dbStatus?: DbStatus;
   onOpenServers: () => void;
   onOpenAccess: () => void;
   onOpenTemplates: () => void;
@@ -12,7 +14,7 @@ interface Props {
   onLogout: () => void;
 }
 
-export function StatusBar({ sessionStart, onOpenServers, onOpenAccess, onOpenTemplates, onOpenLogs, onLogout }: Props) {
+export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess, onOpenTemplates, onOpenLogs, onLogout }: Props) {
   const now = useNow(1000);
   const { config, me, room } = useStore();
   const [latency, setLatency] = useState(24);
@@ -43,6 +45,44 @@ export function StatusBar({ sessionStart, onOpenServers, onOpenAccess, onOpenTem
       </div>
 
       <div className="ml-auto flex items-center gap-1.5 md:gap-2 lg:ml-0">
+        {dbStatus && (
+          <span
+            className={`hidden items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] tracking-wider sm:flex ${
+              dbStatus.state === "online"
+                ? "border-live/50 bg-live/10 text-live"
+                : dbStatus.state === "connecting"
+                  ? "border-amber/50 bg-amber/10 text-amber blink-rec"
+                  : dbStatus.state === "error"
+                    ? "border-rec/50 bg-rec/10 text-rec"
+                    : "border-line bg-panel2 text-faint"
+            }`}
+            title={
+              dbStatus.state === "online"
+                ? `PostgreSQL (PostgREST) · ${dbStatus.latencyMs} мс · пользователей в БД: ${dbStatus.userCount}`
+                : dbStatus.state === "error"
+                  ? `PostgreSQL недоступна: ${dbStatus.error} — локальный режим`
+                  : "PostgreSQL · локальный режим (localStorage)"
+            }
+          >
+            <span
+              className={`led ${
+                dbStatus.state === "online"
+                  ? "bg-live shadow-[0_0_7px_rgba(49,217,138,0.9)]"
+                  : dbStatus.state === "error"
+                    ? "bg-rec shadow-[0_0_7px_rgba(255,77,94,0.9)]"
+                    : "bg-faint"
+              }`}
+            />
+            PG
+            {dbStatus.state === "online"
+              ? `·${dbStatus.latencyMs}мс`
+              : dbStatus.state === "error"
+                ? "·ОШИБКА"
+                : dbStatus.state === "connecting"
+                  ? "·ПОДКЛ"
+                  : "·ЛОКАЛ"}
+          </span>
+        )}
         <span
           className={`hidden items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[10px] tracking-wider xl:flex ${
             config.macroscop.enabled

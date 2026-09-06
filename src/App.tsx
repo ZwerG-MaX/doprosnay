@@ -20,11 +20,12 @@ import {
 } from "./lib/data";
 import { fmtClock, useInterval } from "./lib/hooks";
 import { usePtt } from "./lib/usePtt";
+import { backend, onDbStatus, getDbStatus, type DbStatus } from "./lib/backend";
 
 let nextId = 1;
 
 function Shell() {
-  const { config, users, me, room, myRooms, logout, setRoomId } = useStore();
+  const { config, users, me, room, myRooms, logout, setRoomId, hydrateFromDb } = useStore();
 
   const [events, setEvents] = useState<EventItem[]>([]);
   const [toasts, setToasts] = useState<{ id: number; text: string }[]>([]);
@@ -34,16 +35,24 @@ function Shell() {
   const [accessOpen, setAccessOpen] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [dbStatus, setDbStatus] = useState<DbStatus>(getDbStatus());
 
   const sessionStart = useRef(Date.now());
   const scheduled = useRef<Set<string>>(new Set());
   const connectedRef = useRef<Observer[]>(connected);
   connectedRef.current = connected;
+  const meRef = useRef(me);
+  meRef.current = me;
+
+  /* подписка на статус PostgreSQL */
+  useEffect(() => onDbStatus(setDbStatus), []);
 
   const addEvent = useCallback((type: EventType, text: string) => {
     setEvents((prev) =>
       [{ id: nextId++, time: fmtClock(new Date()), type, text }, ...prev].slice(0, 60),
     );
+    /* дублируем событие в аудит PostgreSQL (если БД доступна) */
+    backend.audit(type, text, meRef.current?.name ?? null);
   }, []);
 
   const pushToast = useCallback((text: string) => {
@@ -78,6 +87,35 @@ function Shell() {
 
   const mumbleLive = mumbleOnline && mumbleEnabled;
   const ptt = usePtt(mumbleLive, addEvent);
+
+  /* PostgreSQL: подключение и гидрация данных (пользователи, конфиг, шаблоны).
+     При недоступной БД пульт прозрачно остаётся в локальном режиме. */
+  useEffect(() => {
+    let alive = true;
+    backend.init(config.backend.apiUrl, config.backend.enabled).then(async (ok) => {
+      if (!ok || !alive) return;
+      try {
+        const [u, c, t] = await Promise.all([
+          backend.fetchUsers(),
+          backend.fetchConfig(),
+          backend.fetchTemplates(),
+        ]);
+        if (!alive) return;
+        hydrateFromDb(u, c, t);
+        addEvent(
+          "sys",
+          `PostgreSQL: данные загружены — пользователей: ${u.length}, шаблонов: ${Object.keys(t).length}`,
+        );
+      } catch (e) {
+        if (alive)
+          addEvent("sys", `PostgreSQL: не удалось прочитать данные (${e instanceof Error ? e.message : "ошибка"})`);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.backend.apiUrl, config.backend.enabled]);
 
   /* при входе / смене комнаты — пересобираем канал наблюдателей */
   useEffect(() => {
@@ -171,6 +209,7 @@ function Shell() {
     <div className="flex min-h-screen flex-col text-fg lg:h-screen lg:overflow-hidden">
       <StatusBar
         sessionStart={sessionStart.current}
+        dbStatus={dbStatus}
         onOpenServers={() => setServersOpen(true)}
         onOpenAccess={() => setAccessOpen(true)}
         onOpenTemplates={() => setTemplatesOpen(true)}

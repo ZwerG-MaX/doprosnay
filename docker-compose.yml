@@ -2,7 +2,7 @@
 #  Пульт наблюдения «Допросная №2» · единый стек через Traefik
 #
 #  Домены (добавьте в /etc/hosts или DNS):
-#    127.0.0.1  pult.local docs.local cloud.local
+#    127.0.0.1  pult.local docs.local cloud.local mumble.local api.local
 #
 #  Поднять всё:   docker compose up -d --build
 #  Журналы:       docker compose logs -f
@@ -32,6 +32,44 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       # - traefik_certs:/letsencrypt
+    restart: unless-stopped
+
+  # ── PostgreSQL: пользователи, права, конфиг, шаблоны, протоколы, аудит ──
+  db:
+    image: postgres:16-alpine
+    container_name: rt-db
+    environment:
+      POSTGRES_USER: pult
+      POSTGRES_PASSWORD: pult-db-2026
+      POSTGRES_DB: pult
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./infra/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pult -d pult"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ── PostgREST: автоматический REST API поверх PostgreSQL ──
+  api:
+    image: postgrest/postgrest:v12.2.3
+    container_name: rt-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://pult:pult-db-2026@db:5432/pult
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: pult_anon
+      PGRST_SERVER_PORT: "3000"
+      PGRST_SERVER_CORS_ALLOWED_ORIGINS: "*"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.local`)"
+      - "traefik.http.routers.api.entrypoints=web"
+      - "traefik.http.services.api.loadbalancer.server.port=3000"
     restart: unless-stopped
 
   # ── Пульт наблюдения (собирается из Dockerfile) ──
@@ -170,6 +208,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  db_data:
   docs_data:
   docs_log:
   docs_cache:
