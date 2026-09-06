@@ -421,7 +421,7 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
               }`}
               style={{ background: o.color }}
             >
-              {o.name.replace(/^(майор|капитан|ст\. л-т)\s+/i, "").slice(0, 2).toUpperCase()}
+              {o.name.slice(0, 2).toUpperCase()}
             </span>
           ))}
           <span className="pl-3 font-mono text-[9.5px] text-faint">{observers.length + 1} в сети</span>

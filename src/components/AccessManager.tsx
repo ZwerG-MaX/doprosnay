@@ -107,7 +107,7 @@ export function AccessManager({ onClose, onToast }: Props) {
                           className="grid h-7 w-7 shrink-0 place-items-center rounded-full font-display text-[10px] font-bold text-ink"
                           style={{ background: u.color }}
                         >
-                          {u.name.replace(/^(майор|капитан|ст\. л-т)\s+/i, "").slice(0, 2).toUpperCase()}
+                          {u.name.slice(0, 2).toUpperCase()}
                         </span>
                         <div className="min-w-0">
                           <div className="truncate text-[12px] font-semibold text-fg">

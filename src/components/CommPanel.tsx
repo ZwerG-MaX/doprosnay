@@ -162,8 +162,8 @@ export function CommPanel({ connected, online, ptt, onJoin, onLeave, onEvent }: 
             {room.mumbleChannel.toUpperCase()} · ГРОМКАЯ СВЯЗЬ
           </div>
           <div className="mt-1 border-l-2 border-amber/50 pl-1">
-            {userRow("s", "#ff8a3d", "SLD", "следователь · майор Ребров", 101)}
-            {userRow("o", "#ff8a3d", "OPR", "оперативник · ст. л-т Ткачук", 102)}
+            {userRow("s", "#ff8a3d", "SLD", "следователь · Ребров", 101)}
+            {userRow("o", "#ff8a3d", "OPR", "оперативник · Ткачук", 102)}
           </div>
         </div>
 
