@@ -38,6 +38,18 @@ alter table users alter column login    set not null;
 alter table users alter column password set not null;
 create unique index if not exists users_login_uq on users (login);
 
+-- ── комнаты (динамические, управляет администратор) ─────────────
+create table if not exists rooms (
+  id             text primary key,
+  code           text not null,
+  name           text not null,
+  mumble_channel text not null default '',
+  doc_title      text not null default '',
+  doc_key        text not null default '',
+  cameras        jsonb not null default '[]',
+  updated_at     timestamptz not null default now()
+);
+
 -- ── конфигурация серверов (singleton) ───────────────────────────
 create table if not exists server_config (
   id          integer primary key default 1 check (id = 1),

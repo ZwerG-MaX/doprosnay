@@ -66,9 +66,17 @@ const IMG_B =
 const IMG_C =
   "https://image.qwenlm.ai/generated-images/21fdf25a-e53b-4830-98b1-3344d1c2c7b1/_result.png";
 
+/** Пресеты видеокадров, которые админ может назначать камерам новых комнат. */
+export const CAM_PRESETS: { id: string; label: string; src: string; kb: string }[] = [
+  { id: "A", label: "Общий план", src: IMG_A, kb: "kb-1" },
+  { id: "B", label: "Крупный план", src: IMG_B, kb: "kb-2" },
+  { id: "C", label: "Вид сверху", src: IMG_C, kb: "kb-3" },
+];
+
 /* ── комнаты ──────────────────────────────────────── */
 
-export const ROOMS: RoomDef[] = [
+/** Комнаты по умолчанию — одна допросная. Остальные добавляет администратор. */
+export const DEFAULT_ROOMS: RoomDef[] = [
   {
     id: "r1",
     code: "Д-01",
@@ -82,32 +90,24 @@ export const ROOMS: RoomDef[] = [
       { id: "cam03", num: "CAM 03", label: "ВИД СВЕРХУ", rtsp: "", src: IMG_C, kb: "kb-3" },
     ],
   },
-  {
-    id: "r2",
-    code: "Д-02",
-    name: "Допросная №2",
-    mumbleChannel: "Допросная №2",
-    docTitle: "Протокол наблюдения — комната №2",
-    docKey: "d02-2026-0417",
-    cameras: [
-      { id: "cam01", num: "CAM 01", label: "ШИРОКИЙ УГОЛ", rtsp: "", src: IMG_B, kb: "kb-2" },
-      { id: "cam02", num: "CAM 02", label: "ЛИЦО КРУПНО", rtsp: "", src: IMG_A, kb: "kb-1" },
-      { id: "cam03", num: "CAM 03", label: "ПОТОЛОЧНАЯ", rtsp: "", src: IMG_C, kb: "kb-3" },
-    ],
-  },
-  {
-    id: "r3",
-    code: "К-01",
-    name: "Комната очных ставок",
-    mumbleChannel: "Очная ставка",
-    docTitle: "Протокол очной ставки",
-    docKey: "k01-2026-0417",
-    cameras: [
-      { id: "cam01", num: "CAM 01", label: "ОБЩИЙ ПЛАН", rtsp: "", src: IMG_C, kb: "kb-3" },
-      { id: "cam02", num: "CAM 02", label: "БОКОВОЙ РАКУРС", rtsp: "", src: IMG_A, kb: "kb-1" },
-    ],
-  },
 ];
+
+/** Генерация уникального id для новой комнаты. */
+export const genRoomId = () => `r${Date.now().toString(36)}${Math.floor(Math.random() * 90 + 10)}`;
+
+/** Сборка новой камеры из пресета кадра. */
+export function makeCamera(presetId: string, index: number): CameraDef {
+  const p = CAM_PRESETS.find((x) => x.id === presetId) ?? CAM_PRESETS[0];
+  const n = String(index).padStart(2, "0");
+  return {
+    id: `cam${n}${Date.now().toString(36)}`,
+    num: `CAM ${n}`,
+    label: p.label.toUpperCase(),
+    rtsp: "",
+    src: p.src,
+    kb: p.kb,
+  };
+}
 
 /* ── пользователи и права (по умолчанию) ──────────── */
 
@@ -142,6 +142,7 @@ export const LS_KEYS = {
   users: "rt-dopros.users.v2",
   session: "rt-dopros.session.v2",
   room: "rt-dopros.room.v2",
+  rooms: "rt-dopros.rooms.v2",
   templates: "rt-dopros.templates.v2",
 };
 
@@ -236,6 +237,24 @@ export const DEFAULT_TEMPLATES: Record<string, string> = {
 Подписи сторон:
 Следователь: ______________`,
 };
+
+/** Универсальный шаблон для комнат, у которых нет собственного (добавленных админом). */
+export const GENERIC_TEMPLATE = `ПРОТОКОЛ НАБЛЮДЕНИЯ
+Комната: {КОМНАТА} · Дело № {ДЕЛО}
+Дата: {ДАТА} · Время: {ВРЕМЯ} · Аудиоканал: {КАНАЛ}
+
+── УСТАНОВОЧНАЯ ЧАСТЬ ──
+
+
+── ЗАПИСИ НАБЛЮДАТЕЛЕЙ ──
+
+
+── ИТОГИ ──
+
+
+Подписи сторон:
+Следователь: ______________
+Старший смены: ______________`;
 
 const p2 = (n: number) => String(n).padStart(2, "0");
 

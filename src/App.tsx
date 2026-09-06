@@ -10,6 +10,7 @@ import { ServerSettingsModal } from "./components/ServerSettingsModal";
 import { AccessManager } from "./components/AccessManager";
 import { LogViewer } from "./components/LogViewer";
 import { TemplateManager } from "./components/TemplateManager";
+import { RoomManager } from "./components/RoomManager";
 import { IcShield } from "./components/Icons";
 import { StoreProvider, mumbleUrlOf, useStore } from "./lib/store";
 import {
@@ -35,6 +36,7 @@ function Shell() {
   const [accessOpen, setAccessOpen] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [roomsOpen, setRoomsOpen] = useState(false);
   const [dbStatus, setDbStatus] = useState<DbStatus>(getDbStatus());
 
   const sessionStart = useRef(Date.now());
@@ -95,16 +97,17 @@ function Shell() {
     backend.init(config.backend.apiUrl, config.backend.enabled).then(async (ok) => {
       if (!ok || !alive) return;
       try {
-        const [u, c, t] = await Promise.all([
+        const [u, c, t, r] = await Promise.all([
           backend.fetchUsers(),
           backend.fetchConfig(),
           backend.fetchTemplates(),
+          backend.fetchRooms(),
         ]);
         if (!alive) return;
-        hydrateFromDb(u, c, t);
+        hydrateFromDb(u, c, t, r);
         addEvent(
           "sys",
-          `PostgreSQL: данные загружены — пользователей: ${u.length}, шаблонов: ${Object.keys(t).length}`,
+          `PostgreSQL: данные загружены — пользователей: ${u.length}, комнат: ${r.length}, шаблонов: ${Object.keys(t).length}`,
         );
       } catch (e) {
         if (alive)
@@ -212,6 +215,7 @@ function Shell() {
         dbStatus={dbStatus}
         onOpenServers={() => setServersOpen(true)}
         onOpenAccess={() => setAccessOpen(true)}
+        onOpenRooms={() => setRoomsOpen(true)}
         onOpenTemplates={() => setTemplatesOpen(true)}
         onOpenLogs={() => setLogsOpen(true)}
         onLogout={logout}
@@ -250,6 +254,7 @@ function Shell() {
       )}
       {accessOpen && <AccessManager onClose={() => setAccessOpen(false)} onToast={pushToast} />}
       {templatesOpen && <TemplateManager onClose={() => setTemplatesOpen(false)} onToast={pushToast} />}
+      {roomsOpen && <RoomManager onClose={() => setRoomsOpen(false)} onToast={pushToast} />}
       {logsOpen && <LogViewer onClose={() => setLogsOpen(false)} onToast={pushToast} />}
 
       {/* уведомления */}

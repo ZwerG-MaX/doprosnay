@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { ROOMS, type UserRec } from "../lib/data";
+import { type RoomDef, type UserRec } from "../lib/data";
 import { useStore } from "../lib/store";
 import { IcUsers, IcClose, IcEye, IcPen, IcShield, IcPlus, IcTrash, IcChevR } from "./Icons";
 
@@ -23,7 +23,8 @@ const emptyForm = {
 };
 
 export function AccessManager({ onClose, onToast }: Props) {
-  const { users, me, patchUser, createUser, deleteUser } = useStore();
+  const { users, me, rooms, patchUser, createUser, deleteUser } = useStore();
+  const ROOMS: RoomDef[] = rooms;
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [formErr, setFormErr] = useState<string | null>(null);

@@ -13,7 +13,7 @@
  */
 
 import { log } from "./logger";
-import type { ServerConfig, UserRec } from "./data";
+import type { RoomDef, ServerConfig, UserRec } from "./data";
 
 export type DbState = "off" | "connecting" | "online" | "error";
 
@@ -53,6 +53,36 @@ export interface DocRow {
   updated_by: string | null;
   updated_at: string;
 }
+
+interface RoomRow {
+  id: string;
+  code: string;
+  name: string;
+  mumble_channel: string;
+  doc_title: string;
+  doc_key: string;
+  cameras: unknown;
+}
+
+const rowToRoom = (r: RoomRow): RoomDef => ({
+  id: r.id,
+  code: r.code,
+  name: r.name,
+  mumbleChannel: r.mumble_channel,
+  docTitle: r.doc_title,
+  docKey: r.doc_key,
+  cameras: (Array.isArray(r.cameras) ? r.cameras : []) as RoomDef["cameras"],
+});
+
+const roomToRow = (r: RoomDef): RoomRow => ({
+  id: r.id,
+  code: r.code,
+  name: r.name,
+  mumble_channel: r.mumbleChannel,
+  doc_title: r.docTitle,
+  doc_key: r.docKey,
+  cameras: r.cameras,
+});
 
 const rowToUser = (r: UserRow): UserRec => ({
   id: r.id,
@@ -162,6 +192,20 @@ export const backend = {
 
   deleteUser: (id: string): Promise<void> =>
     req(`/users?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" }).then(() => undefined),
+
+  /* ── комнаты ── */
+  fetchRooms: (): Promise<RoomDef[]> =>
+    req<RoomRow[]>("/rooms?select=*&order=id").then((rows) => rows.map(rowToRoom)),
+
+  saveRoom: (r: RoomDef): Promise<void> =>
+    req("/rooms", {
+      method: "POST",
+      headers: UPSERT,
+      body: JSON.stringify({ ...roomToRow(r), updated_at: new Date().toISOString() }),
+    }).then(() => undefined),
+
+  deleteRoom: (id: string): Promise<void> =>
+    req(`/rooms?id=eq.${encodeURIComponent(id)}`, { method: "DELETE" }).then(() => undefined),
 
   /** Проверка логина/пароля через RPC PostgREST (пароль не уходит в клиентский список). */
   checkLogin: (login: string, password: string): Promise<UserRec | null> =>

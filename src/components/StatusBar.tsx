@@ -2,19 +2,20 @@ import { useState } from "react";
 import { useNow, useInterval, fmtClock, fmtDate, fmtDur, randInt } from "../lib/hooks";
 import { useStore, mumbleUrlOf } from "../lib/store";
 import type { DbStatus } from "../lib/backend";
-import { RtMark, IcGear, IcUsers, IcLogout, IcShield, IcFile, IcTemplate } from "./Icons";
+import { RtMark, IcGear, IcUsers, IcLogout, IcShield, IcFile, IcTemplate, IcRooms } from "./Icons";
 
 interface Props {
   sessionStart: number;
   dbStatus?: DbStatus;
   onOpenServers: () => void;
   onOpenAccess: () => void;
+  onOpenRooms: () => void;
   onOpenTemplates: () => void;
   onOpenLogs: () => void;
   onLogout: () => void;
 }
 
-export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess, onOpenTemplates, onOpenLogs, onLogout }: Props) {
+export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess, onOpenRooms, onOpenTemplates, onOpenLogs, onLogout }: Props) {
   const now = useNow(1000);
   const { config, me, room } = useStore();
   const [latency, setLatency] = useState(24);
@@ -146,10 +147,17 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
             </button>
             <button
               onClick={onOpenAccess}
-              title="Управление доступом: комнаты и права"
+              title="Управление доступом: пользователи и права"
               className="grid h-8 w-8 place-items-center rounded-full border border-line bg-panel2 text-dim transition-all hover:border-hud/60 hover:text-hud hover:shadow-[0_0_12px_rgba(0,176,240,0.25)] active:scale-90"
             >
               <IcUsers className="h-4 w-4" />
+            </button>
+            <button
+              onClick={onOpenRooms}
+              title="Управление комнатами: названия и камеры"
+              className="grid h-8 w-8 place-items-center rounded-full border border-line bg-panel2 text-dim transition-all hover:border-amber/60 hover:text-amber hover:shadow-[0_0_12px_rgba(255,138,61,0.25)] active:scale-90"
+            >
+              <IcRooms className="h-4 w-4" />
             </button>
             <button
               onClick={onOpenTemplates}
