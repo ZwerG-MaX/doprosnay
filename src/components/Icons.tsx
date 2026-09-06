@@ -2,10 +2,11 @@ interface IconProps {
   className?: string;
 }
 
+/* RT Gen2 иконографика: сетка 24×24, штрих 2px, скруглённые окончания. */
 const S = {
   fill: "none",
   stroke: "currentColor",
-  strokeWidth: 1.8,
+  strokeWidth: 2,
   strokeLinecap: "round" as const,
   strokeLinejoin: "round" as const,
 };

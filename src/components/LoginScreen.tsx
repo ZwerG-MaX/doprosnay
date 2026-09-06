@@ -235,10 +235,10 @@ export function LoginScreen() {
             <span className="font-display text-lg font-extrabold uppercase tracking-wide">СКИТ</span>
           </div>
 
-          <h1 className="font-display text-[24px] font-extrabold uppercase leading-tight tracking-wide text-fg">
+          <h1 className="display-s-strong font-display uppercase tracking-wide text-fg">
             Вход в <span className="rt-grad-text">пульт наблюдения</span>
           </h1>
-          <p className="mt-1.5 text-[13px] text-dim">
+          <p className="body-m mt-2 text-dim">
             Введите логин и пароль. Учётные записи и права назначает администратор.
           </p>
 
@@ -260,7 +260,7 @@ export function LoginScreen() {
               onChange={(e) => setLoginStr(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()}
               placeholder="например, skit"
-              className="h-11 w-full rounded-lg border border-line bg-panel2 px-3.5 font-mono text-[13px] lowercase text-fg outline-none transition-all placeholder:text-faint focus:border-hud/70 focus:shadow-[0_0_0_3px_rgba(0,176,240,0.12)]"
+              className="rt-input body-m lowercase"
             />
           </label>
 
@@ -274,7 +274,7 @@ export function LoginScreen() {
               onChange={(e) => setPwd(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()}
               placeholder="••••••"
-              className="h-11 w-full rounded-lg border border-line bg-panel2 px-3.5 font-mono text-[13px] text-fg outline-none transition-all placeholder:text-faint focus:border-hud/70 focus:shadow-[0_0_0_3px_rgba(0,176,240,0.12)]"
+              className="rt-input body-m"
             />
           </label>
 

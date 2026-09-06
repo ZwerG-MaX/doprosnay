@@ -82,7 +82,7 @@ export function RoomManager({ onClose, onToast }: Props) {
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 md:p-6">
       <div className="absolute inset-0 bg-black/75 backdrop-blur-[3px]" onClick={onClose} />
-      <div className="rise relative flex max-h-full w-full max-w-[880px] flex-col overflow-hidden rounded-xl border border-line2 bg-panel shadow-[0_30px_90px_rgba(0,0,0,0.6)]">
+      <div className="rise relative flex max-h-full w-full max-w-[880px] flex-col overflow-hidden rounded-rt-l border border-line2 bg-panel shadow-rt-4">
         <header className="flex h-12 shrink-0 items-center gap-2.5 border-b border-line bg-panel2/70 px-4">
           <IcRooms className="h-4.5 w-4.5 text-hud" />
           <h2 className="font-display text-[12px] tracking-[0.18em] text-fg">УПРАВЛЕНИЕ КОМНАТАМИ</h2>

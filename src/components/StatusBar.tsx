@@ -26,21 +26,21 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
       <div className="flex min-w-0 items-center gap-2.5">
         <RtMark className="h-7 w-7 shrink-0" />
         <div className="min-w-0 leading-tight">
-          <div className="font-display text-[12px] uppercase tracking-[0.14em] text-fg">
+          <div className="heading-h5 font-display uppercase tracking-[0.14em] text-fg">
             <span className="rt-grad-text">СКИТ</span>{" "}
             <span className="hidden text-dim sm:inline">· Допросная</span>
           </div>
-          <div className="truncate font-mono text-[9px] tracking-wider text-faint">
+          <div className="description-m truncate font-mono text-faint">
             {room.code} · {room.name.toUpperCase()}
           </div>
         </div>
       </div>
 
       <div className="mx-auto hidden flex-col items-center leading-none lg:flex">
-        <span className="font-mono text-[22px] font-semibold tracking-widest text-fg tabular-nums">
+        <span className="font-mono text-[22px] font-bold tracking-widest text-fg tabular-nums">
           {fmtClock(now)}
         </span>
-        <span className="mt-1 font-mono text-[9.5px] tracking-[0.22em] text-faint">
+        <span className="description-s mt-1 font-mono tracking-[0.22em] text-faint">
           {fmtDate(now)} · СМЕНА Б · ПОСТ 7
         </span>
       </div>
