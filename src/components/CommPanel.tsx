@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { type EventType, type Observer } from "../lib/data";
+import { type EventType, type Observer, shortName } from "../lib/data";
 import { useStore, mumbleUrlOf } from "../lib/store";
 import { useInterval, randInt } from "../lib/hooks";
 import { AudioConsole } from "./AudioConsole";
@@ -194,7 +194,7 @@ export function CommPanel({ connected, online, ptt, onJoin, onLeave, onEvent }: 
                 String(o.n),
                 o.color,
                 o.tag,
-                o.n === 1 ? `${o.name} (вы)` : o.name,
+                o.n === 1 ? `${shortName(o.name)} (вы)` : shortName(o.name),
                 o.n,
                 o.muted,
                 () => onLeave(o),

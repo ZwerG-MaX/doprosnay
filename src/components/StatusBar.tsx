@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNow, useInterval, fmtClock, fmtDate, fmtDur, randInt } from "../lib/hooks";
 import { useStore, mumbleUrlOf } from "../lib/store";
 import type { DbStatus } from "../lib/backend";
+import { initialsOf } from "../lib/data";
 import { RtMark, IcGear, IcUsers, IcLogout, IcShield, IcFile, IcTemplate, IcRooms } from "./Icons";
 
 interface Props {
@@ -123,7 +124,7 @@ export function StatusBar({ sessionStart, dbStatus, onOpenServers, onOpenAccess,
             className="grid h-6 w-6 place-items-center rounded-full font-display text-[9px] font-bold text-ink"
             style={{ background: me?.color }}
           >
-            {me?.name.slice(0, 2).toUpperCase()}
+            {me ? initialsOf(me.name) : "—"}
           </span>
           <span className="hidden flex-col leading-none md:flex">
             <span className="max-w-[120px] truncate text-[11px] font-semibold text-fg">{me?.name}</span>

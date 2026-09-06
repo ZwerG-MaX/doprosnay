@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { type RoomDef, type UserRec } from "../lib/data";
+import { type RoomDef, type UserRec, initialsOf, shortName } from "../lib/data";
 import { useStore } from "../lib/store";
 import { IcUsers, IcClose, IcEye, IcPen, IcShield, IcPlus, IcTrash, IcChevR } from "./Icons";
 
@@ -48,7 +48,7 @@ export function AccessManager({ onClose, onToast }: Props) {
   const submitForm = () => {
     const login = form.login.trim().toLowerCase();
     if (!form.name.trim() || !login || !form.password) {
-      setFormErr("Заполните имя, логин и пароль");
+      setFormErr("Заполните ФИО, логин и пароль");
       return;
     }
     if (users.some((u) => u.login.toLowerCase() === login)) {
@@ -155,13 +155,22 @@ export function AccessManager({ onClose, onToast }: Props) {
 
           {formOpen && (
             <div className="mt-2.5 space-y-2.5 pb-1">
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-                <label className="block">
-                  <span className="mb-1 block font-mono text-[9px] tracking-[0.18em] text-faint">ИМЯ *</span>
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
+                <label className="block md:col-span-2 xl:col-span-1">
+                  <span className="mb-1 block font-mono text-[9px] tracking-[0.18em] text-faint">ФИО ПОЛНОСТЬЮ *</span>
                   <input
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="Фамилия"
+                    placeholder="Иванов Иван Иванович"
+                    className="h-8 w-full rounded-md border border-line bg-panel px-2.5 font-mono text-[12px] text-fg outline-none focus:border-hud/70"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block font-mono text-[9px] tracking-[0.18em] text-faint">СПЕЦИАЛЬНОСТЬ</span>
+                  <input
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                    placeholder="специалист"
                     className="h-8 w-full rounded-md border border-line bg-panel px-2.5 font-mono text-[12px] text-fg outline-none focus:border-hud/70"
                   />
                 </label>
@@ -304,7 +313,7 @@ export function AccessManager({ onClose, onToast }: Props) {
                           className="grid h-7 w-7 shrink-0 place-items-center rounded-full font-display text-[10px] font-bold text-ink"
                           style={{ background: u.color }}
                         >
-                          {u.name.slice(0, 2).toUpperCase()}
+                          {initialsOf(u.name)}
                         </span>
                         <div className="min-w-0">
                           <div className="truncate text-[12px] font-semibold text-fg">

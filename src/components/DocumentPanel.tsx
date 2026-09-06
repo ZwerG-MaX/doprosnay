@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { PHRASES, docLsKey, renderTemplate, type EventType, type Observer } from "../lib/data";
+import { PHRASES, docLsKey, renderTemplate, type EventType, type Observer, shortName, initialsOf } from "../lib/data";
 import { useStore } from "../lib/store";
 import { log } from "../lib/logger";
 import { fmtClock, randInt } from "../lib/hooks";
@@ -303,11 +303,11 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
           setTypingObs(null);
           setText((prev) => prev + `\n[${obs.tag} · ${fmtClock(new Date())}] ${phrase}`);
           persist(textRef.current + `\n[${obs.tag} · ${fmtClock(new Date())}] ${phrase}`);
-          setRibbon({ id: editId++, tag: obs.tag, name: obs.name, color: obs.color, text: phrase });
+          setRibbon({ id: editId++, tag: obs.tag, name: shortName(obs.name), color: obs.color, text: phrase });
           setRibbonFade(false);
           window.clearTimeout(ribbonTimer.current);
           ribbonTimer.current = window.setTimeout(() => setRibbonFade(true), 2600);
-          onEvent("doc", `${obs.tag} (${obs.name}): запись добавлена в документ`);
+          onEvent("doc", `${obs.tag} (${shortName(obs.name)}): запись добавлена в документ`);
           tick();
         }, randInt(1500, 2600));
       }, randInt(9000, 15000));
@@ -437,19 +437,19 @@ export function DocumentPanel({ observers, onEvent, onToast }: Props) {
               className="grid h-6 w-6 place-items-center rounded-full border-2 border-panel font-display text-[8.5px] font-bold text-ink"
               style={{ background: me.color }}
             >
-              {me.name.slice(0, 2).toUpperCase()}
+              {initialsOf(me.name)}
             </span>
           )}
           {observers.map((o) => (
             <span
               key={o.n}
-              title={`${o.name} · ${o.role}`}
+              title={`${shortName(o.name)} · ${o.role}`}
               className={`grid h-6 w-6 place-items-center rounded-full border-2 border-panel font-display text-[8.5px] font-bold text-ink ${
                 typingObs === o.n ? "typing-ring" : ""
               }`}
               style={{ background: o.color }}
             >
-              {o.name.slice(0, 2).toUpperCase()}
+              {initialsOf(o.name)}
             </span>
           ))}
           <span className="pl-3 font-mono text-[9.5px] text-faint">{observers.length + 1} в сети</span>
