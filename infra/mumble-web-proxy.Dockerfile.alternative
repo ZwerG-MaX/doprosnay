@@ -1,5 +1,5 @@
 # Альтернативный Dockerfile для mumble-web-proxy
-# Загружает готовый бинарник из GitHub releases для быстрого развёртывания
+# Загружает готовый бинарник из форка для быстрого развёртывания
 # Runtime образ: Debian slim (совместимость с glibc)
 
 FROM debian:bookworm-slim
@@ -8,7 +8,7 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     ca-certificates \
-    libnice0 \
+    libnice10 \
     libglib2.0-0 \
     libssl3 \
     libopus0 \
@@ -17,9 +17,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Скачиваем готовый бинарник из GitHub releases
-# Версия 0.5.0 - последняя стабильная на момент создания
-RUN wget -q https://github.com/Johni0702/mumble-web-proxy/releases/download/v0.5.0/mumble-web-proxy \
+# Скачиваем готовый бинарник из форка
+RUN wget -q https://github.com/ZwerG-MaX/mumble-web-proxy-rust-1.89/releases/download/untagged-d7079c08d2d466eb476d/mumble-web-proxy \
     -O /usr/local/bin/mumble-web-proxy \
     && chmod +x /usr/local/bin/mumble-web-proxy
 

@@ -32,7 +32,7 @@ npm run dev          # http://localhost:5173
   - Команда сборки: `cargo build --workspace --release`
 - **Этап 2 (runtime):** Debian slim образ для runtime (~100-150 MB, совместимость с glibc)
   - Образ: `debian:bookworm-slim`
-  - Runtime зависимости: `libnice0`, `libglib2.0-0`, `libssl3`, `libopus0`, `libogg0`
+  - Runtime зависимости: `libnice10`, `libglib2.0-0`, `libssl3`, `libopus0`, `libogg0`
   - Копируется только бинарник из builder
 
 ```bash

@@ -76,13 +76,13 @@ git clone --depth 1 https://github.com/ZwerG-MaX/mumble-web-proxy-rust-1.89.git 
 cargo build --workspace --release
 ```
 
-### Этап 2: Runtime (alpine:3.19)
+### Этап 2: Runtime (debian:bookworm-slim)
 
-**Образ:** `alpine:3.19` (~5 MB)
+**Образ:** `debian:bookworm-slim` (~5 MB)
 
 **Runtime зависимости:**
 ```bash
-libnice glib openssl opus libogg ca-certificates
+libnice10 libglib2.0-0 libssl3 libopus0 libogg0 ca-certificates
 ```
 
 **Копируется:**
@@ -90,14 +90,14 @@ libnice glib openssl opus libogg ca-certificates
 COPY --from=builder /src/target/release/mumble-web-proxy /usr/local/bin/mumble-web-proxy
 ```
 
-**Финальный размер:** ~50-80 MB
+**Финальный размер:** ~100-150 MB
 
 ## Преимущества решения
 
 - ✅ **Совместимость с OpenSSL 3.x** (Debian Bookworm, Ubuntu 22.04+)
 - ✅ **Rust 1.89** с новыми функциями
 - ✅ **Обновлённые зависимости** из форка
-- ✅ **Лёгкий Alpine образ** для runtime (~50-80 MB вместо ~800 MB)
+- ✅ **Debian slim образ** для runtime (~100-150 MB, совместимость с glibc)
 - ✅ **Использует Dockerfile из репозитория** для компиляции
 - ✅ **Минимальный размер финального образа**
 - ✅ **Multi-stage сборка** разделяет build и runtime окружения

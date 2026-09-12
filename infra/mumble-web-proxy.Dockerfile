@@ -37,7 +37,7 @@ FROM debian:bookworm-slim
 
 # Runtime зависимости (только библиотеки, без dev-пакетов)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libnice0 \
+    libnice10 \
     libglib2.0-0 \
     libssl3 \
     libopus0 \
