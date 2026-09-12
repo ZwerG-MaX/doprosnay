@@ -47,7 +47,7 @@ RUN apk add --no-cache \
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libnice0 \
+    libnice10 \
     libglib2.0-0 \
     libssl3 \
     libopus0 \
@@ -79,7 +79,7 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     ca-certificates \
-    libnice0 \
+    libnice10 \
     libglib2.0-0 \
     libssl3 \
     libopus0 \
