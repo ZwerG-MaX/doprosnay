@@ -123,6 +123,12 @@ chmod +x build-mumble-proxy.sh
 ./build-mumble-proxy.sh --quick
 ```
 
+## Миграция на Podman
+
+Проект полностью переведён на **Podman**. Docker и docker-compose больше не поддерживаются.
+
+Подробная документация: [PODMAN-MIGRATION.md](PODMAN-MIGRATION.md)
+
 ### Вариант 3: Пропустить mumble-web-proxy
 
 Если не нужен веб-интерфейс Mumble:
@@ -132,6 +138,27 @@ chmod +x build-mumble-proxy.sh
 rm quadlet/rt-mumble-proxy.container
 rm quadlet/rt-mumble-web.container
 systemctl --user daemon-reload
+```
+
+## Развёртывание через Podman Compose
+
+Для быстрого развёртывания всего стека:
+
+```bash
+# Установите podman-compose
+pip install podman-compose
+
+# Запуск стека
+podman-compose up -d --build
+
+# Проверка статуса
+podman-compose ps
+
+# Просмотр логов
+podman-compose logs -f
+
+# Остановка стека
+podman-compose down
 ```
 
 ## Развёртывание через Podman Quadlet

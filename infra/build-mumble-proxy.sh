@@ -10,15 +10,16 @@ cd "$SCRIPT_DIR"
 echo "=== Сборка mumble-web-proxy ==="
 echo ""
 
-# Проверяем наличие Podman или Docker
-if command -v podman &> /dev/null; then
-    CONTAINER_CMD="podman"
-elif command -v docker &> /dev/null; then
-    CONTAINER_CMD="docker"
-else
-    echo "Ошибка: не найден podman или docker"
+# Проверяем наличие Podman
+if ! command -v podman &> /dev/null; then
+    echo "Ошибка: не найден podman"
+    echo "Установите Podman:"
+    echo "  Fedora/RHEL: sudo dnf install podman"
+    echo "  Ubuntu/Debian: sudo apt install podman"
     exit 1
 fi
+
+CONTAINER_CMD="podman"
 
 echo "Используется: $CONTAINER_CMD"
 echo ""

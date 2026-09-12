@@ -46,8 +46,6 @@ cargo:warning=build/expando.c:4:24: error: pasting "RUST_VERSION_OPENSSL_" and "
 ```bash
 cd infra/
 podman build -t rt-mumble-web-proxy:latest -f mumble-web-proxy.Dockerfile .
-# или
-docker build -t rt-mumble-web-proxy:latest -f mumble-web-proxy.Dockerfile .
 ```
 
 **Время сборки:** ~5-10 минут  
