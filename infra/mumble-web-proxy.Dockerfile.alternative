@@ -1,0 +1,26 @@
+# Альтернативный mumble-web-proxy: использование готового бинарника
+# Этот вариант быстрее и не требует компиляции
+
+FROM debian:bookworm-slim
+
+# Устанавливаем зависимости
+RUN apt-get update && apt-get install -y \
+    wget \
+    libssl3 \
+    libopus0 \
+    libogg0 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Скачиваем готовый бинарник (если доступен в релизах)
+# Или копируем локально собранный бинарник
+COPY mumble-web-proxy /usr/local/bin/mumble-web-proxy
+
+# Делаем исполняемым
+RUN chmod +x /usr/local/bin/mumble-web-proxy
+
+EXPOSE 1337/tcp 64737/udp
+
+CMD ["mumble-web-proxy"]

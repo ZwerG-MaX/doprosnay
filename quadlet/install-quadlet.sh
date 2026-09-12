@@ -121,8 +121,12 @@ install() {
     fi
 
     if ! podman image exists rt-mumble-web-proxy:latest; then
-        log_info "Сборка образа rt-mumble-web-proxy..."
-        podman build -t rt-mumble-web-proxy:latest -f "$PROJECT_DIR/infra/mumble-web-proxy.Dockerfile" "$PROJECT_DIR/infra/"
+        log_info "Сборка образа rt-mumble-web-proxy (может занять 5-10 минут)..."
+        podman build -t rt-mumble-web-proxy:latest -f "$PROJECT_DIR/infra/mumble-web-proxy.Dockerfile" "$PROJECT_DIR/infra/" || {
+            log_error "Не удалось собрать образ rt-mumble-web-proxy"
+            log_warn "Попробуйте альтернативный вариант из PRODUCTION.md"
+            exit 1
+        }
         log_success "Образ rt-mumble-web-proxy собран"
     else
         log_warn "Образ rt-mumble-web-proxy уже существует, пропускаем сборку"
