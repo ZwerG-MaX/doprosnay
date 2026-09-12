@@ -89,18 +89,10 @@ grant select, insert, update, delete on users, server_config, templates, documen
 grant select, insert on audit_log to pult_anon;
 grant usage on sequence audit_log_id_seq to pult_anon;
 
--- ── сид: пользователи (8 наблюдателей, u1 — админ) ───────────────
-insert into users (id, login, password, name, title, is_admin, color, muted, view_rooms, edit_rooms) values
-  ('u0', 'skit',      'skit', 'Оператор СКИТ',   'демо-доступ', true,  '#7a28cb', false, '{r1,r2,r3}', '{r1,r2,r3}'),
-  ('u1', 'sokolov',   'skit', 'Соколов',         'специалист', true,  '#00b0f0', false, '{r1,r2,r3}', '{r1,r2,r3}'),
-  ('u2', 'eremina',   'skit', 'Ерёмина',         'специалист', false, '#f04e9a', false, '{r1,r2,r3}', '{r1,r2}'),
-  ('u3', 'volkov',    'skit', 'Волков',          'специалист', false, '#31d98a', false, '{r1,r2}',    '{r1}'),
-  ('u4', 'danilova',  'skit', 'Данилова О. В.',  'специалист', false, '#b57bff', false, '{r2}',       '{}'),
-  ('u5', 'gushchin',  'skit', 'Гущин П. А.',     'специалист', false, '#ff8a3d', true,  '{r1}',       '{}'),
-  ('u6', 'kim',       'skit', 'Ким С. Р.',       'специалист', false, '#ffd83d', false, '{r1,r2}',    '{r1,r2}'),
-  ('u7', 'lanskaya',  'skit', 'Ланская Е. А.',   'специалист', false, '#7a9bff', false, '{r1,r2}',    '{}'),
-  ('u8', 'kramarenko','skit', 'Крамаренко Д. И.','специалист', false, '#ff6b6b', false, '{r1,r3}',   '{r3}')
-on conflict (id) do nothing;
+-- ── сид: пользователи отсутствуют ────────────────────────────────
+-- Первый администратор создаётся через экран входа при первом запуске.
+-- Если в системе нет ни одного пользователя, экран входа автоматически
+-- превращается в форму создания первого администратора.
 
 -- ── RPC: проверка логина/пароля (возвращает строку пользователя или пусто) ──
 create or replace function public.check_login(p_login text, p_password text)

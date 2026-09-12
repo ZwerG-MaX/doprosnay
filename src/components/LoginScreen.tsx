@@ -9,11 +9,18 @@ type St = "checking" | "online" | "offline";
 const strip = (u: string) => u.replace(/^https?:\/\//, "").replace(/\/+$/, "");
 
 export function LoginScreen() {
-  const { login, config } = useStore();
+  const { login, config, users, createUser } = useStore();
   const [loginStr, setLoginStr] = useState("");
   const [pwd, setPwd] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
+
+  /* ── состояние формы создания первого администратора ── */
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [firstLogin, setFirstLogin] = useState("");
+  const [firstPwd, setFirstPwd] = useState("");
+  const [createBusy, setCreateBusy] = useState(false);
 
   /* ── цели опроса четырёх серверов ── */
   const targets = useMemo(
@@ -104,6 +111,40 @@ export function LoginScreen() {
     setAuthBusy(false);
     if (!u) {
       setErr("Неверный логин или пароль");
+      window.setTimeout(() => setErr(null), 2600);
+    }
+  };
+
+  const submitFirstAdmin = () => {
+    const fullName = `${lastName} ${firstName}`.trim();
+    const login = firstLogin.trim().toLowerCase();
+    if (!fullName || !login || !firstPwd) {
+      setErr("Заполните все поля");
+      window.setTimeout(() => setErr(null), 2600);
+      return;
+    }
+    if (firstPwd.length < 4) {
+      setErr("Пароль должен быть не менее 4 символов");
+      window.setTimeout(() => setErr(null), 2600);
+      return;
+    }
+    setCreateBusy(true);
+    setErr(null);
+    try {
+      createUser({
+        name: fullName,
+        login,
+        password: firstPwd,
+        title: "администратор",
+        isAdmin: true,
+        color: "#00b0f0",
+        view: [],
+        edit: [],
+      });
+      setCreateBusy(false);
+    } catch {
+      setErr("Ошибка создания администратора");
+      setCreateBusy(false);
       window.setTimeout(() => setErr(null), 2600);
     }
   };
@@ -227,7 +268,7 @@ export function LoginScreen() {
         <div className="rt-stripe" />
       </aside>
 
-      {/* ── форма входа ── */}
+      {/* ── форма входа / создания первого админа ── */}
       <main className={`flex items-center justify-center p-5 ${err ? "shake" : ""}`}>
         <div className="rise w-full max-w-[520px]">
           <div className="mb-5 flex items-center gap-3 lg:hidden">
@@ -235,60 +276,142 @@ export function LoginScreen() {
             <span className="font-display text-lg font-extrabold uppercase tracking-wide">СКИТ</span>
           </div>
 
-          <h1 className="display-s-strong font-display uppercase tracking-wide text-fg">
-            Вход в <span className="rt-grad-text">пульт наблюдения</span>
-          </h1>
-          <p className="body-m mt-2 text-dim">
-            Введите логин и пароль. Учётные записи и права назначает администратор.
-          </p>
+          {users.length === 0 ? (
+            <>
+              <h1 className="display-s-strong font-display uppercase tracking-wide text-fg">
+                <span className="rt-grad-text">Первый запуск</span>
+              </h1>
+              <p className="body-m mt-2 text-dim">
+                Создайте первого администратора системы. После этого вы сможете войти и управлять пользователями.
+              </p>
 
-          {/* сообщение об ошибке */}
-          {err && (
-            <div className="mt-4 flex items-center gap-2 rounded-lg border border-rec/50 bg-rec/10 px-3.5 py-2.5 font-mono text-[11px] tracking-wide text-rec">
-              <span className="led bg-rec shadow-[0_0_7px_rgba(255,77,94,0.9)]" />
-              {err}
-            </div>
+              {/* сообщение об ошибке */}
+              {err && (
+                <div className="mt-4 flex items-center gap-2 rounded-lg border border-rec/50 bg-rec/10 px-3.5 py-2.5 font-mono text-[11px] tracking-wide text-rec">
+                  <span className="led bg-rec shadow-[0_0_7px_rgba(255,77,94,0.9)]" />
+                  {err}
+                </div>
+              )}
+
+              {/* фамилия */}
+              <label className="mt-5 block">
+                <span className="mb-1.5 block font-mono text-[10px] tracking-[0.22em] text-faint">ФАМИЛИЯ *</span>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Иванов"
+                  className="rt-input body-m"
+                />
+              </label>
+
+              {/* имя */}
+              <label className="mt-3 block">
+                <span className="mb-1.5 block font-mono text-[10px] tracking-[0.22em] text-faint">ИМЯ *</span>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="Иван"
+                  className="rt-input body-m"
+                />
+              </label>
+
+              {/* логин */}
+              <label className="mt-3 block">
+                <span className="mb-1.5 block font-mono text-[10px] tracking-[0.22em] text-faint">ЛОГИН *</span>
+                <input
+                  type="text"
+                  value={firstLogin}
+                  onChange={(e) => setFirstLogin(e.target.value)}
+                  placeholder="ivanov"
+                  className="rt-input body-m lowercase"
+                />
+              </label>
+
+              {/* пароль */}
+              <label className="mt-3 block">
+                <span className="mb-1.5 block font-mono text-[10px] tracking-[0.22em] text-faint">ПАРОЛЬ * (мин. 4 символа)</span>
+                <input
+                  type="password"
+                  value={firstPwd}
+                  onChange={(e) => setFirstPwd(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && submitFirstAdmin()}
+                  placeholder="••••••"
+                  className="rt-input body-m"
+                />
+              </label>
+
+              <button
+                onClick={submitFirstAdmin}
+                disabled={createBusy || !lastName.trim() || !firstName.trim() || !firstLogin.trim() || !firstPwd}
+                className="rt-grad-bg mt-5 flex h-12 w-full items-center justify-center gap-2.5 rounded-lg font-display text-[13px] font-bold tracking-[0.2em] text-white transition-all hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35 disabled:saturate-50"
+              >
+                {createBusy ? "СОЗДАНИЕ…" : "СОЗДАТЬ АДМИНИСТРАТОРА"}
+              </button>
+
+              <p className="mt-3 text-center font-mono text-[9.5px] leading-relaxed tracking-wide text-faint">
+                Первый администратор получит полный доступ ко всем функциям системы
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="display-s-strong font-display uppercase tracking-wide text-fg">
+                Вход в <span className="rt-grad-text">пульт наблюдения</span>
+              </h1>
+              <p className="body-m mt-2 text-dim">
+                Введите логин и пароль. Учётные записи и права назначает администратор.
+              </p>
+
+              {/* сообщение об ошибке */}
+              {err && (
+                <div className="mt-4 flex items-center gap-2 rounded-lg border border-rec/50 bg-rec/10 px-3.5 py-2.5 font-mono text-[11px] tracking-wide text-rec">
+                  <span className="led bg-rec shadow-[0_0_7px_rgba(255,77,94,0.9)]" />
+                  {err}
+                </div>
+              )}
+
+              {/* логин */}
+              <label className="mt-5 block">
+                <span className="mb-1.5 block font-mono text-[10px] tracking-[0.22em] text-faint">ЛОГИН</span>
+                <input
+                  type="text"
+                  autoComplete="username"
+                  value={loginStr}
+                  onChange={(e) => setLoginStr(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && submit()}
+                  placeholder="например, skit"
+                  className="rt-input body-m lowercase"
+                />
+              </label>
+
+              {/* пароль */}
+              <label className="mt-3 block">
+                <span className="mb-1.5 block font-mono text-[10px] tracking-[0.22em] text-faint">ПАРОЛЬ</span>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={pwd}
+                  onChange={(e) => setPwd(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && submit()}
+                  placeholder="••••••"
+                  className="rt-input body-m"
+                />
+              </label>
+
+              <button
+                onClick={submit}
+                disabled={authBusy || !loginStr.trim() || !pwd}
+                className="rt-grad-bg mt-5 flex h-12 w-full items-center justify-center gap-2.5 rounded-lg font-display text-[13px] font-bold tracking-[0.2em] text-white transition-all hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35 disabled:saturate-50"
+              >
+                {authBusy ? "ПРОВЕРКА…" : "ВОЙТИ В СИСТЕМУ"}
+              </button>
+
+              <p className="mt-3 text-center font-mono text-[9.5px] leading-relaxed tracking-wide text-faint">
+                Учётные записи создаются администратором в панели «Доступ»
+              </p>
+            </>
           )}
-
-          {/* логин */}
-          <label className="mt-5 block">
-            <span className="mb-1.5 block font-mono text-[10px] tracking-[0.22em] text-faint">ЛОГИН</span>
-            <input
-              type="text"
-              autoComplete="username"
-              value={loginStr}
-              onChange={(e) => setLoginStr(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submit()}
-              placeholder="например, skit"
-              className="rt-input body-m lowercase"
-            />
-          </label>
-
-          {/* пароль */}
-          <label className="mt-3 block">
-            <span className="mb-1.5 block font-mono text-[10px] tracking-[0.22em] text-faint">ПАРОЛЬ</span>
-            <input
-              type="password"
-              autoComplete="current-password"
-              value={pwd}
-              onChange={(e) => setPwd(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && submit()}
-              placeholder="••••••"
-              className="rt-input body-m"
-            />
-          </label>
-
-          <button
-            onClick={submit}
-            disabled={authBusy || !loginStr.trim() || !pwd}
-            className="rt-grad-bg mt-5 flex h-12 w-full items-center justify-center gap-2.5 rounded-lg font-display text-[13px] font-bold tracking-[0.2em] text-white transition-all hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35 disabled:saturate-50"
-          >
-            {authBusy ? "ПРОВЕРКА…" : "ВОЙТИ В СИСТЕМУ"}
-          </button>
-
-          <p className="mt-3 text-center font-mono text-[9.5px] leading-relaxed tracking-wide text-faint">
-            демо-доступ: <b className="text-dim">skit / skit</b> (администратор) · остальные учётные записи — в PostgreSQL
-          </p>
         </div>
       </main>
     </div>
