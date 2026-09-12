@@ -31,9 +31,9 @@ cargo:warning=build/expando.c:4:24: error: pasting "RUST_VERSION_OPENSSL_" and "
   - Образ: `rust:1.89-bookworm`
   - Нативные зависимости из README репозитория: `build-essential`, `pkg-config`, `clang`, `libclang-dev`, `libnice-dev`, `libglib2.0-dev`, `libssl-dev`
   - Команда сборки: `cargo build --workspace --release`
-- **Этап 2 (runtime):** Лёгкий Alpine образ для runtime (~50-80 MB)
-  - Образ: `alpine:3.19`
-  - Runtime зависимости: `libnice`, `glib`, `openssl`, `opus`, `libogg`
+- **Этап 2 (runtime):** Debian slim образ для runtime (~100-150 MB, совместимость с glibc)
+  - Образ: `debian:bookworm-slim`
+  - Runtime зависимости: `libnice0`, `libglib2.0-0`, `libssl3`, `libopus0`, `libogg0`
   - Копируется только бинарник из builder
 
 ```bash
@@ -47,7 +47,7 @@ podman build -t rt-mumble-web-proxy:latest -f mumble-web-proxy.Dockerfile .
 - ✅ Совместимость с OpenSSL 3.x (Debian Bookworm, Ubuntu 22.04+)
 - ✅ Rust 1.89 с новыми функциями
 - ✅ Обновлённые зависимости
-- ✅ Лёгкий Alpine образ для runtime (~50-80 MB вместо ~800 MB)
+- ✅ Debian slim образ для runtime (~100-150 MB, совместимость с glibc)
 - ✅ Использует Dockerfile из репозитория для компиляции
 - ✅ Минимальный размер финального образа
 

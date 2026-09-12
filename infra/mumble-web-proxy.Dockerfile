@@ -31,18 +31,19 @@ RUN git clone --depth 1 https://github.com/ZwerG-MaX/mumble-web-proxy-rust-1.89.
 RUN cargo build --workspace --release
 
 # ═══════════════════════════════════════════════════════════════
-# ЭТАП 2: Runtime (лёгкий Alpine образ)
+# ЭТАП 2: Runtime (Debian slim для совместимости с glibc)
 # ═══════════════════════════════════════════════════════════════
-FROM alpine:3.19
+FROM debian:bookworm-slim
 
 # Runtime зависимости (только библиотеки, без dev-пакетов)
-RUN apk add --no-cache \
-    libnice \
-    glib \
-    openssl \
-    opus \
-    libogg \
-    ca-certificates
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libnice0 \
+    libglib2.0-0 \
+    libssl3 \
+    libopus0 \
+    libogg0 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 # Копируем скомпилированный бинарник из builder
 COPY --from=builder /src/target/release/mumble-web-proxy /usr/local/bin/mumble-web-proxy
