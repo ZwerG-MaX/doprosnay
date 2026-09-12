@@ -1,0 +1,22 @@
+[Unit]
+Description=PostgreSQL 16 — база данных пульта
+After=rt-dopros-net.network rt-dopros-db-data.volume
+Requires=rt-dopros-net.network rt-dopros-db-data.volume
+
+[Container]
+Image=docker.io/library/postgres:16-alpine
+ContainerName=rt-db
+Environment=POSTGRES_USER=pult
+Environment=POSTGRES_PASSWORD=pult-db-2026
+Environment=POSTGRES_DB=pult
+Volume=rt-dopros-db-data.volume:/var/lib/postgresql/data:Z
+Volume=./infra/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro,Z
+Network=rt-dopros-net.network
+HealthCmd=pg_isready -U pult -d pult
+HealthInterval=10s
+HealthTimeout=3s
+HealthRetries=5
+PublishPort=5432:5432
+
+[Install]
+WantedBy=default.target

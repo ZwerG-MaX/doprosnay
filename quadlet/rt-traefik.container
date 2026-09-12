@@ -1,0 +1,21 @@
+[Unit]
+Description=Traefik — reverse proxy
+After=rt-dopros-net.network
+Requires=rt-dopros-net.network
+
+[Container]
+Image=docker.io/library/traefik:v3.1
+ContainerName=rt-traefik
+Volume=/var/run/podman/podman.sock:/var/run/docker.sock:ro
+Network=rt-dopros-net.network
+PublishPort=80:80
+PublishPort=8080:8080
+Arg=--providers.docker=true
+Arg=--providers.docker.exposedbydefault=false
+Arg=--entrypoints.web.address=:80
+Arg=--api.dashboard=true
+Arg=--api.insecure=true
+Arg=--log.level=INFO
+
+[Install]
+WantedBy=default.target

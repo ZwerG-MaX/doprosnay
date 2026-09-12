@@ -1,0 +1,17 @@
+[Unit]
+Description=mumble-web-proxy — мост Mumble ⇄ WebSocket/WebRTC
+After=rt-mumble.service rt-dopros-net.network
+Requires=rt-mumble.service rt-dopros-net.network
+
+[Container]
+Image=quay.io/podman/stable:latest
+ContainerName=rt-mumble-proxy
+# В Quadlet нельзя собрать образ на лету — нужно предварительно:
+#   podman build -t rt-mumble-web-proxy -f infra/mumble-web-proxy.Dockerfile
+# Затем заменить Image на rt-mumble-web-proxy
+Image=rt-mumble-web-proxy:latest
+Network=rt-dopros-net.network
+PublishPort=64737:64737/udp
+
+[Install]
+WantedBy=default.target

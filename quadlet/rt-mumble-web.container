@@ -1,0 +1,13 @@
+[Unit]
+Description=mumble-web — HTML5-клиент Mumble
+After=rt-mumble-proxy.service rt-dopros-net.network
+Requires=rt-mumble-proxy.service rt-dopros-net.network
+
+[Container]
+Image=docker.io/leoverto/mumble-web:latest
+ContainerName=rt-mumble-web
+Network=rt-dopros-net.network
+PublishPort=8081:80
+
+[Install]
+WantedBy=default.target

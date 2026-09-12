@@ -1,0 +1,17 @@
+[Unit]
+Description=Mumble (Murmur) — голосовой сервер
+After=rt-dopros-net.network rt-dopros-mumble-data.volume
+Requires=rt-dopros-net.network rt-dopros-mumble-data.volume
+
+[Container]
+Image=docker.io/mumblevoip/mumble-server:latest
+ContainerName=rt-mumble
+Environment=MUMBLE_SUPERUSER_PASSWORD=rt-mumble-2026
+Environment=MUMBLE_CONFIG_WELCOMETEXT=Пульт наблюдения · Допросная · СКИТ
+Volume=rt-dopros-mumble-data.volume:/data:Z
+Network=rt-dopros-net.network
+PublishPort=64738:64738/tcp
+PublishPort=64738:64738/udp
+
+[Install]
+WantedBy=default.target
