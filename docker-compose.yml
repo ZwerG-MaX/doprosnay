@@ -141,7 +141,8 @@ services:
   #   /proxy → mumble-web-proxy:1337, поэтому имя сервиса ниже ОБЯЗАТЕЛЬНО
   #   должно быть mumble-web-proxy).
   # mumble-web-proxy — мост Mumble ⇄ WebSocket (TCP-контрол) + WebRTC (UDP-звук).
-  #   UDP 64737 пробрасывается на хост: браузер шлёт медиа напрямую.
+  #   64737/tcp — WebSocket для mumble-web
+  #   20000-21000/udp — порты для WebRTC ICE
   #   Если UDP недоступен, mumble-web автоматически работает по WebSocket.
   mumble-web-proxy:
     build:
@@ -151,7 +152,8 @@ services:
     depends_on:
       - mumble
     ports:
-      - "64737:64737/udp"
+      - "64737:64737/tcp"
+      - "20000-21000:20000-21000/udp"
     restart: unless-stopped
 
   mumble-web:
