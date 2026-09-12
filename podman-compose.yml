@@ -4,8 +4,8 @@
 #  Домены (добавьте в /etc/hosts или DNS):
 #    127.0.0.1  pult.local docs.local cloud.local mumble.local api.local
 #
-#  Поднять всё:   docker compose up -d --build
-#  Журналы:       docker compose logs -f
+#  Поднять всё:   podman-compose up -d --build
+#  Журналы:       podman-compose logs -f
 #  Traefik-дашборд (dev):  http://localhost:8080
 # ═══════════════════════════════════════════════════════════════
 
@@ -15,8 +15,8 @@ services:
     image: traefik:v3.1
     container_name: rt-traefik
     command:
-      - "--providers.docker=true"
-      - "--providers.docker.exposedbydefault=false"
+      - "--providers.podman=true"
+      - "--providers.podman.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
       - "--api.dashboard=true"
       - "--api.insecure=true"                 # дев-режим: дашборд на :8080
@@ -30,7 +30,7 @@ services:
       - "80:80"
       - "8080:8080"                           # Traefik dashboard (только dev!)
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /run/user/1000/podman/podman.sock:/run/podman/podman.sock:ro
       # - traefik_certs:/letsencrypt
     restart: unless-stopped
 
@@ -112,7 +112,6 @@ services:
       NEXTCLOUD_ADMIN_PASSWORD: rt-cloud-2026
       NEXTCLOUD_TRUSTED_DOMAINS: "cloud.local localhost"
       NEXTCLOUD_DEFAULT_PHONE_REGION: "RU"
-      # без внешних БД → автоматически используется встроенная SQLite
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.cloud.rule=Host(`cloud.local`)"
@@ -136,14 +135,7 @@ services:
       - mumble_data:/data
     restart: unless-stopped
 
-  # ── Аудиоконсоль в браузере: mumble-web + WebSocket/WebRTC-прокси ──
-  # mumble-web — HTML5-клиент (nginx образа отдаёт приложение и проксирует
-  #   /proxy → mumble-web-proxy:1337, поэтому имя сервиса ниже ОБЯЗАТЕЛЬНО
-  #   должно быть mumble-web-proxy).
-  # mumble-web-proxy — мост Mumble ⇄ WebSocket (TCP-контрол) + WebRTC (UDP-звук).
-  #   64737/tcp — WebSocket для mumble-web
-  #   20000-21000/udp — порты для WebRTC ICE
-  #   Если UDP недоступен, mumble-web автоматически работает по WebSocket.
+  # ── Аудиоконсоль: mumble-web + WebSocket/WebRTC-прокси ──
   mumble-web-proxy:
     build:
       context: ./infra
@@ -177,16 +169,13 @@ services:
     volumes:
       - ./infra/mediamtx.yml:/mediamtx.yml:ro
     ports:
-      - "8554:8554"        # RTSP
-      - "8888:8888"        # HLS + HTTP API
-      - "8889:8889"        # WebRTC (сигналинг)
-      - "8890:8890/udp"    # WebRTC (медиа)
+      - "8554:8554"
+      - "8888:8888"
+      - "8889:8889"
+      - "8890:8890/udp"
     restart: unless-stopped
 
-  # ── Демо-VMS: эмулятор MACROSCOP (3 тестовых RTSP-потока с таймкодом) ──
-  #    MACROSCOP — коммерческая VMS без публичного образа, поэтому в демо
-  #    её роль играет ffmpeg-источник. Для реального VMS удалите этот сервис
-  #    и пропишите RTSP-адреса ваших камер в infra/mediamtx.yml.
+  # ── Демо-VMS: эмулятор MACROSCOP (3 тестовых RTSP-потока) ──
   vms-demo:
     image: jrottenberg/ffmpeg:6.1-alpine
     container_name: rt-vms-demo
@@ -204,9 +193,9 @@ services:
           -f rtsp rtsp://0.0.0.0:8556/cam03 &
         wait
     ports:
-      - "9554:8554"        # RTSP cam01 (демо)
-      - "9555:8555"        # RTSP cam02 (демо)
-      - "9556:8556"        # RTSP cam03 (демо)
+      - "9554:8554"
+      - "9555:8555"
+      - "9556:8556"
     restart: unless-stopped
 
 volumes:

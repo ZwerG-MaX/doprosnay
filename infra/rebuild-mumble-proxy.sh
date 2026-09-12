@@ -9,27 +9,27 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 echo "=== Пересборка mumble-web-proxy ==="
 echo ""
 
-# Проверяем наличие Podman или Docker
-if command -v podman &> /dev/null; then
-    CONTAINER_CMD="podman"
-    COMPOSE_CMD="podman compose"
-elif command -v docker &> /dev/null; then
-    CONTAINER_CMD="docker"
-    COMPOSE_CMD="docker compose"
-else
-    echo "Ошибка: не найден podman или docker"
+# Проверяем наличие Podman
+if ! command -v podman &> /dev/null; then
+    echo "Ошибка: не найден podman"
+    echo "Установите Podman:"
+    echo "  Fedora/RHEL: sudo dnf install podman"
+    echo "  Ubuntu/Debian: sudo apt install podman"
     exit 1
 fi
+
+CONTAINER_CMD="podman"
+COMPOSE_CMD="podman-compose"
 
 echo "Используется: $CONTAINER_CMD"
 echo ""
 
-# Проверяем, используется ли docker-compose или quadlet
-if [ -f "$PROJECT_DIR/docker-compose.yml" ]; then
-    echo "Обнаружен docker-compose.yml"
+# Проверяем, используется ли podman-compose или quadlet
+if [ -f "$PROJECT_DIR/podman-compose.yml" ]; then
+    echo "Обнаружен podman-compose.yml"
     USE_COMPOSE=true
 else
-    echo "docker-compose.yml не найден, используется Quadlet"
+    echo "podman-compose.yml не найден, используется Quadlet"
     USE_COMPOSE=false
 fi
 

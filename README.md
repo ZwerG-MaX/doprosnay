@@ -123,6 +123,12 @@ chmod +x build-mumble-proxy.sh
 ./build-mumble-proxy.sh --quick
 ```
 
+## Миграция на Podman
+
+Проект полностью переведён на **Podman**. Docker и docker-compose больше не поддерживаются.
+
+Подробная документация: [PODMAN-MIGRATION.md](PODMAN-MIGRATION.md)
+
 ### Вариант 3: Пропустить mumble-web-proxy
 
 Если не нужен веб-интерфейс Mumble:
@@ -134,9 +140,9 @@ rm quadlet/rt-mumble-web.container
 systemctl --user daemon-reload
 ```
 
-## Развёртывание через Podman Quadlet
+## Развёртывание через Podman Quadlet (основной метод)
 
-Для production-развёртывания с автозапуском:
+**Рекомендуется для production-развёртывания** с автозапуском и интеграцией с systemd.
 
 ```bash
 # Установка Quadlet-конфигурации
@@ -146,8 +152,44 @@ chmod +x quadlet/install-quadlet.sh
 # Запуск стека
 systemctl --user start rt-dopros.target
 
-# Включить автозапуск
+# Включить автозапуск при загрузке
 systemctl --user enable rt-dopros.target
+
+# Проверка статуса
+systemctl --user status rt-dopros.target
+
+# Просмотр логов
+journalctl --user -u rt-dopros.target -f
+```
+
+**Преимущества Quadlet:**
+- ✅ Интеграция с systemd
+- ✅ Автозапуск при загрузке системы
+- ✅ Rootless режим (без root-прав)
+- ✅ Мониторинг через `systemctl` и `journalctl`
+- ✅ Управление зависимостями между сервисами
+
+Подробная документация: [QUADLET.md](QUADLET.md), [QUADLET-README.md](QUADLET-README.md)
+
+## Развёртывание через Podman Compose (альтернатива)
+
+Для быстрого тестирования или разработки:
+
+```bash
+# Установите podman-compose
+pip install podman-compose
+
+# Запуск стека
+podman-compose up -d --build
+
+# Проверка статуса
+podman-compose ps
+
+# Просмотр логов
+podman-compose logs -f
+
+# Остановка стека
+podman-compose down
 ```
 
 ## Структура проекта
