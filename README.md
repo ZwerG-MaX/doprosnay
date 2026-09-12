@@ -97,16 +97,51 @@ systemctl --user enable rt-dopros.target
 **Troubleshooting mumble-web-proxy:**
 
 Если при сборке возникает ошибка с `openssl-sys`:
-```bash
-# Используйте обновлённый Dockerfile
-podman build -t rt-mumble-web-proxy:latest -f infra/mumble-web-proxy.Dockerfile infra/
 
-# Или пропустите mumble-web-proxy, если не нужен веб-интерфейс Mumble
+**Вариант 1: Debian Bullseye (рекомендуется)**
+
+Использует OpenSSL 1.1.1, совместимый с `openssl-sys@0.9.54`:
+
+```bash
+cd infra/
+podman build -t rt-mumble-web-proxy:latest -f mumble-web-proxy.Dockerfile .
+# Время сборки: ~5-10 минут
+```
+
+**Вариант 2: Готовый бинарник (быстро)**
+
+Загружает готовый бинарник из GitHub releases:
+
+```bash
+cd infra/
+podman build -t rt-mumble-web-proxy:latest -f mumble-web-proxy.Dockerfile.alternative .
+# Время сборки: ~1 минута
+```
+
+**Вариант 3: Автоматический скрипт**
+
+```bash
+cd infra/
+chmod +x build-mumble-proxy.sh
+./build-mumble-proxy.sh
+# Или для быстрой сборки:
+./build-mumble-proxy.sh --quick
+```
+
+**Вариант 4: Пропустить mumble-web-proxy**
+
+Если не нужен веб-интерфейс Mumble (используете нативный клиент):
+
+```bash
 rm ~/.config/containers/systemd/rt-mumble-proxy.container
+rm ~/.config/containers/systemd/rt-mumble-web.container
 systemctl --user daemon-reload
 ```
 
-Подробная документация: [QUADLET.md](QUADLET.md), [TROUBLESHOOTING.md](quadlet/TROUBLESHOOTING.md)
+Подробная документация:
+- [QUADLET.md](QUADLET.md) - развёртывание через Quadlet
+- [TROUBLESHOOTING.md](quadlet/TROUBLESHOOTING.md) - общее руководство
+- [MUMBLE-PROXY-BUILD.md](infra/MUMBLE-PROXY-BUILD.md) - детальная документация по сборке mumble-web-proxy
 
 ---
 
