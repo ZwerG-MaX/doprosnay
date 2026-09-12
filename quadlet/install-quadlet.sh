@@ -121,13 +121,53 @@ install() {
     fi
 
     if ! podman image exists rt-mumble-web-proxy:latest; then
-        log_info "Сборка образа rt-mumble-web-proxy (может занять 5-10 минут)..."
-        podman build -t rt-mumble-web-proxy:latest -f "$PROJECT_DIR/infra/mumble-web-proxy.Dockerfile" "$PROJECT_DIR/infra/" || {
-            log_error "Не удалось собрать образ rt-mumble-web-proxy"
-            log_warn "Попробуйте альтернативный вариант из PRODUCTION.md"
-            exit 1
-        }
-        log_success "Образ rt-mumble-web-proxy собран"
+        log_info "Сборка образа rt-mumble-web-proxy..."
+        echo ""
+        echo "Выберите вариант сборки:"
+        echo "  1) Из исходников с Debian Bullseye (рекомендуется, ~5-10 минут)"
+        echo "  2) Готовый бинарник из GitHub releases (быстро, ~1 минута)"
+        echo "  3) Пропустить (не устанавливать mumble-web-proxy)"
+        echo ""
+        read -p "Ваш выбор [1/2/3]: " mumble_choice
+        
+        case $mumble_choice in
+            1)
+                log_info "Сборка из исходников (Debian Bullseye + OpenSSL 1.1.1)..."
+                podman build -t rt-mumble-web-proxy:latest -f "$PROJECT_DIR/infra/mumble-web-proxy.Dockerfile" "$PROJECT_DIR/infra/" || {
+                    log_error "Не удалось собрать образ rt-mumble-web-proxy"
+                    log_warn "Попробуйте вариант 2 (готовый бинарник) или вариант 3 (пропустить)"
+                    echo ""
+                    echo "Подробная документация: infra/MUMBLE-PROXY-BUILD.md"
+                    exit 1
+                }
+                log_success "Образ rt-mumble-web-proxy собран"
+                ;;
+            2)
+                log_info "Загрузка готового бинарника..."
+                podman build -t rt-mumble-web-proxy:latest -f "$PROJECT_DIR/infra/mumble-web-proxy.Dockerfile.alternative" "$PROJECT_DIR/infra/" || {
+                    log_error "Не удалось загрузить готовый бинарник"
+                    log_warn "Попробуйте вариант 1 (сборка из исходников) или вариант 3 (пропустить)"
+                    exit 1
+                }
+                log_success "Образ rt-mumble-web-proxy собран (готовый бинарник)"
+                ;;
+            3)
+                log_warn "Пропускаем установку mumble-web-proxy"
+                log_info "Удаление Quadlet-файлов для mumble-web-proxy и mumble-web..."
+                rm -f "$QUADLET_DIR/rt-mumble-proxy.container"
+                rm -f "$QUADLET_DIR/rt-mumble-web.container"
+                log_success "Quadlet-файлы удалены"
+                ;;
+            *)
+                log_warn "Неверный выбор, используется вариант 1"
+                log_info "Сборка из исходников (Debian Bullseye + OpenSSL 1.1.1)..."
+                podman build -t rt-mumble-web-proxy:latest -f "$PROJECT_DIR/infra/mumble-web-proxy.Dockerfile" "$PROJECT_DIR/infra/" || {
+                    log_error "Не удалось собрать образ rt-mumble-web-proxy"
+                    exit 1
+                }
+                log_success "Образ rt-mumble-web-proxy собран"
+                ;;
+        esac
     else
         log_warn "Образ rt-mumble-web-proxy уже существует, пропускаем сборку"
     fi

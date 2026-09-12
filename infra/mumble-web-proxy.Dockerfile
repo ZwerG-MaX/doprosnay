@@ -1,8 +1,7 @@
 # mumble-web-proxy: мост Mumble ⇄ WebSocket/WebRTC для браузера
-# Официального образа нет — собираем из исходников (Rust)
+# Используем Debian Bullseye с OpenSSL 1.1.1 для совместимости с openssl-sys@0.9.54
 
-# Используем полный Debian образ для сборки (не Alpine из-за musl)
-FROM rust:1.75-bookworm AS build
+FROM rust:1.75-bullseye AS build
 
 # Устанавливаем зависимости для компиляции
 RUN apt-get update && apt-get install -y \
@@ -19,12 +18,12 @@ WORKDIR /src
 RUN git clone --depth 1 https://github.com/Johni0702/mumble-web-proxy.git . \
     && cargo build --release
 
-# Финальный образ на основе Debian slim
-FROM debian:bookworm-slim
+# Финальный образ на основе Debian Bullseye slim
+FROM debian:bullseye-slim
 
 # Устанавливаем runtime зависимости
 RUN apt-get update && apt-get install -y \
-    libssl3 \
+    libssl1.1 \
     libopus0 \
     libogg0 \
     ca-certificates \
