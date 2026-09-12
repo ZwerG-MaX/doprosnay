@@ -9,11 +9,10 @@ ContainerName=rt-pult
 # Предварительная сборка:
 #   podman build -t rt-pult -f Dockerfile .
 Network=rt-dopros-net.network
-PublishPort=8082:80
-
-[Service]
-# Для Traefik-интеграции нужны labels, но Quadlet не поддерживает их напрямую
-# Используйте Podman network aliases или настройте Traefik вручную
+Label=traefik.enable=true
+Label=traefik.http.routers.pult.rule=Host(`pult.local`) || Host(`localhost`) || Host(`127.0.0.1`)
+Label=traefik.http.routers.pult.entrypoints=web
+Label=traefik.http.services.pult.loadbalancer.server.port=80
 
 [Install]
 WantedBy=default.target

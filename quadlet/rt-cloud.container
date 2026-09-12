@@ -12,7 +12,10 @@ Environment=NEXTCLOUD_TRUSTED_DOMAINS=cloud.local localhost
 Environment=NEXTCLOUD_DEFAULT_PHONE_REGION=RU
 Volume=rt-dopros-cloud-data.volume:/var/www/html:Z
 Network=rt-dopros-net.network
-PublishPort=8090:80
+Label=traefik.enable=true
+Label=traefik.http.routers.cloud.rule=Host(`cloud.local`)
+Label=traefik.http.routers.cloud.entrypoints=web
+Label=traefik.http.services.cloud.loadbalancer.server.port=80
 
 [Install]
 WantedBy=default.target

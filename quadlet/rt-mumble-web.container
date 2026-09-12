@@ -7,7 +7,10 @@ Requires=rt-mumble-proxy.service rt-dopros-net.network
 Image=docker.io/leoverto/mumble-web:latest
 ContainerName=rt-mumble-web
 Network=rt-dopros-net.network
-PublishPort=8081:80
+Label=traefik.enable=true
+Label=traefik.http.routers.mumble.rule=Host(`mumble.local`)
+Label=traefik.http.routers.mumble.entrypoints=web
+Label=traefik.http.services.mumble.loadbalancer.server.port=80
 
 [Install]
 WantedBy=default.target

@@ -140,9 +140,40 @@ rm quadlet/rt-mumble-web.container
 systemctl --user daemon-reload
 ```
 
-## Развёртывание через Podman Compose
+## Развёртывание через Podman Quadlet (основной метод)
 
-Для быстрого развёртывания всего стека:
+**Рекомендуется для production-развёртывания** с автозапуском и интеграцией с systemd.
+
+```bash
+# Установка Quadlet-конфигурации
+chmod +x quadlet/install-quadlet.sh
+./quadlet/install-quadlet.sh install
+
+# Запуск стека
+systemctl --user start rt-dopros.target
+
+# Включить автозапуск при загрузке
+systemctl --user enable rt-dopros.target
+
+# Проверка статуса
+systemctl --user status rt-dopros.target
+
+# Просмотр логов
+journalctl --user -u rt-dopros.target -f
+```
+
+**Преимущества Quadlet:**
+- ✅ Интеграция с systemd
+- ✅ Автозапуск при загрузке системы
+- ✅ Rootless режим (без root-прав)
+- ✅ Мониторинг через `systemctl` и `journalctl`
+- ✅ Управление зависимостями между сервисами
+
+Подробная документация: [QUADLET.md](QUADLET.md), [QUADLET-README.md](QUADLET-README.md)
+
+## Развёртывание через Podman Compose (альтернатива)
+
+Для быстрого тестирования или разработки:
 
 ```bash
 # Установите podman-compose
@@ -159,22 +190,6 @@ podman-compose logs -f
 
 # Остановка стека
 podman-compose down
-```
-
-## Развёртывание через Podman Quadlet
-
-Для production-развёртывания с автозапуском:
-
-```bash
-# Установка Quadlet-конфигурации
-chmod +x quadlet/install-quadlet.sh
-./quadlet/install-quadlet.sh install
-
-# Запуск стека
-systemctl --user start rt-dopros.target
-
-# Включить автозапуск
-systemctl --user enable rt-dopros.target
 ```
 
 ## Структура проекта

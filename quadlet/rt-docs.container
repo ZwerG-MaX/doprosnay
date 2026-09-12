@@ -10,7 +10,10 @@ Environment=JWT_ENABLED=false
 Environment=JWT_SECRET=rt-docs-secret-change-me
 Volume=rt-dopros-docs-data.volume:/var/www/onlyoffice/Data:Z
 Network=rt-dopros-net.network
-PublishPort=8080:80
+Label=traefik.enable=true
+Label=traefik.http.routers.docs.rule=Host(`docs.local`)
+Label=traefik.http.routers.docs.entrypoints=web
+Label=traefik.http.services.docs.loadbalancer.server.port=80
 
 [Install]
 WantedBy=default.target
