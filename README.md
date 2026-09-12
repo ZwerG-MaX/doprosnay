@@ -25,6 +25,16 @@ npm run dev          # http://localhost:5173
 
 Используем форк с обновлёнными зависимостями: **https://github.com/ZwerG-MaX/mumble-web-proxy-rust-1.89**
 
+**Multi-stage Dockerfile:**
+- **Этап 1 (builder):** Компиляция из форка с использованием зависимостей из репозитория
+  - Образ: `rust:1.89-bookworm`
+  - Нативные зависимости: `build-essential`, `pkg-config`, `clang`, `libclang-dev`, `libnice-dev`, `libglib2.0-dev`, `libssl-dev`
+  - Команда сборки: `cargo build --workspace --release`
+- **Этап 2 (runtime):** Лёгкий Alpine образ для runtime (~50-80 MB)
+  - Образ: `alpine:3.19`
+  - Runtime зависимости: `libnice`, `glib`, `openssl`, `opus`, `libogg`
+  - Копируется только бинарник из builder
+
 ```bash
 cd infra/
 podman build -t rt-mumble-web-proxy:latest -f mumble-web-proxy.Dockerfile .
@@ -32,19 +42,25 @@ podman build -t rt-mumble-web-proxy:latest -f mumble-web-proxy.Dockerfile .
 docker build -t rt-mumble-web-proxy:latest -f mumble-web-proxy.Dockerfile .
 ```
 
-**Время сборки:** ~5-10 минут
+**Время сборки:** ~5-10 минут  
+**Размер финального образа:** ~50-80 MB
 
-**Преимущества форка:**
+**Преимущества:**
 - ✅ Совместимость с OpenSSL 3.x (Debian Bookworm, Ubuntu 22.04+)
 - ✅ Rust 1.89 с новыми функциями
 - ✅ Обновлённые зависимости
-- ✅ Не требует Debian Bullseye
+- ✅ Лёгкий Alpine образ для runtime
+- ✅ Использует Dockerfile из репозитория для компиляции
+- ✅ Минимальный размер финального образа
 
 ### Проверка сборки
 
 ```bash
 # Проверьте образ
 podman images | grep rt-mumble-web-proxy
+
+# Проверьте размер образа
+podman images rt-mumble-web-proxy:latest --format "{{.Size}}"
 
 # Запустите контейнер
 podman run -d --name rt-mumble-proxy \
@@ -65,7 +81,7 @@ error: failed to run custom build command for `openssl-sys v0.9.54`
 
 **Решение:** Используйте форк с обновлёнными зависимостями (уже настроен в `infra/mumble-web-proxy.Dockerfile`).
 
-Подробная документация: [infra/SOLUTION.md](infra/SOLUTION.md)
+Подробная документация: [infra/FINAL-SOLUTION.md](infra/FINAL-SOLUTION.md)
 
 ## Альтернативные варианты сборки
 
@@ -76,9 +92,23 @@ cd infra/
 podman build -t rt-mumble-web-proxy:latest -f mumble-web-proxy.Dockerfile.alternative .
 ```
 
-**Время сборки:** ~1 минута
+**Время сборки:** ~1 минута  
+**Размер финального образа:** ~50-80 MB
 
-### Вариант 2: Пропустить mumble-web-proxy
+### Вариант 2: Автоматический скрипт
+
+```bash
+cd infra/
+chmod +x build-mumble-proxy.sh
+./build-mumble-proxy.sh
+```
+
+Для быстрой сборки:
+```bash
+./build-mumble-proxy.sh --quick
+```
+
+### Вариант 3: Пропустить mumble-web-proxy
 
 Если не нужен веб-интерфейс Mumble:
 
@@ -114,8 +144,11 @@ systemctl --user enable rt-dopros.target
 │   ├── main.tsx           # Точка входа
 │   └── index.css          # Стили
 ├── infra/                  # Инфраструктура
-│   ├── mumble-web-proxy.Dockerfile  # Dockerfile для mumble-web-proxy
+│   ├── mumble-web-proxy.Dockerfile  # Multi-stage Dockerfile
+│   ├── mumble-web-proxy.Dockerfile.alternative  # Готовый бинарник
+│   ├── build-mumble-proxy.sh  # Скрипт сборки
 │   ├── SOLUTION.md        # Решение проблемы сборки
+│   ├── FINAL-SOLUTION.md  # Полная документация
 │   └── db/                # Инициализация БД
 ├── quadlet/                # Quadlet-конфигурация для systemd
 ├── package.json
@@ -125,7 +158,8 @@ systemctl --user enable rt-dopros.target
 
 ## Документация
 
-- [infra/SOLUTION.md](infra/SOLUTION.md) - решение проблемы сборки mumble-web-proxy
+- [infra/FINAL-SOLUTION.md](infra/FINAL-SOLUTION.md) - полная документация по решению проблемы сборки
+- [infra/SOLUTION.md](infra/SOLUTION.md) - краткое описание решения
 - [Форк mumble-web-proxy](https://github.com/ZwerG-MaX/mumble-web-proxy-rust-1.89) - исходный код форка
 
 ## Лицензия

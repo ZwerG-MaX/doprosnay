@@ -28,9 +28,18 @@ ARCH=$(uname -m)
 echo "Архитектура: $ARCH"
 echo ""
 
-# Вариант 1: Попытка собрать из исходников с Debian Bullseye
-echo "Вариант 1: Сборка из исходников (Debian Bullseye + OpenSSL 1.1.1)"
+# Вариант 1: Multi-stage сборка из форка с Alpine runtime
+echo "Вариант 1: Multi-stage сборка из форка (рекомендуется)"
+echo "  - Этап 1: Компиляция из форка ZwerG-MaX/mumble-web-proxy-rust-1.89"
+echo "  - Этап 2: Лёгкий Alpine образ для runtime"
 echo "Время сборки: ~5-10 минут"
+echo ""
+
+# Вариант 2: Готовый бинарник с Alpine runtime
+echo "Вариант 2: Готовый бинарник из GitHub releases (быстро)"
+echo "  - Загрузка готового бинарника"
+echo "  - Alpine образ для runtime"
+echo "Время сборки: ~1 минута"
 echo ""
 
 if [ "$1" = "--quick" ]; then
@@ -38,7 +47,7 @@ if [ "$1" = "--quick" ]; then
     VARIANT="alternative"
 else
     echo "Выберите вариант:"
-    echo "  1) Сборка из исходников (рекомендуется, ~5-10 минут)"
+    echo "  1) Multi-stage сборка из форка (рекомендуется, ~5-10 минут)"
     echo "  2) Готовый бинарник из GitHub releases (быстро, ~1 минута)"
     echo ""
     read -p "Ваш выбор [1/2]: " choice
@@ -56,7 +65,7 @@ fi
 echo ""
 
 if [ "$VARIANT" = "main" ]; then
-    echo "Сборка из исходников..."
+    echo "Multi-stage сборка из форка..."
     $CONTAINER_CMD build -t rt-mumble-web-proxy:latest -f mumble-web-proxy.Dockerfile .
 else
     echo "Загрузка готового бинарника..."
@@ -68,6 +77,9 @@ echo "=== Сборка завершена ==="
 echo ""
 echo "Проверка образа:"
 $CONTAINER_CMD images | grep rt-mumble-web-proxy
+echo ""
+echo "Размер образа:"
+$CONTAINER_CMD images rt-mumble-web-proxy:latest --format "{{.Size}}"
 echo ""
 echo "Для запуска:"
 echo "  $CONTAINER_CMD run -d --name rt-mumble-proxy \\"
