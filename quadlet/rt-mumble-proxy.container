@@ -11,7 +11,10 @@ ContainerName=rt-mumble-proxy
 # Затем заменить Image на rt-mumble-web-proxy
 Image=rt-mumble-web-proxy:latest
 Network=rt-dopros-net.network
-PublishPort=64737:64737/udp
+# 64737/tcp — WebSocket для mumble-web
+# 20000-21000/udp — порты для WebRTC ICE
+PublishPort=64737:64737/tcp
+PublishPort=20000-21000:20000-21000/udp
 
 [Install]
 WantedBy=default.target

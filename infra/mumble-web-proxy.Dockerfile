@@ -51,9 +51,12 @@ COPY --from=builder /src/target/release/mumble-web-proxy /usr/local/bin/mumble-w
 # Делаем бинарник исполняемым
 RUN chmod +x /usr/local/bin/mumble-web-proxy
 
-# 1337 — WebSocket (через nginx/Traefik на mumble-web)
-# 64737 — UDP для WebRTC-медиа (пробрасывается напрямую)
-EXPOSE 1337/tcp 64737/udp
+# 64737 — WebSocket для mumble-web
+# 20000-21000 — UDP порты для WebRTC ICE
+EXPOSE 64737/tcp 20000-21000/udp
 
-# Запускаем mumble-web-proxy
-CMD ["mumble-web-proxy"]
+# Запуск с обязательными параметрами:
+# --listen-ws 64737 - порт для WebSocket
+# --server rt-mumble:64738 - адрес Mumble сервера (имя контейнера в docker-compose)
+# --ice-port-min/max - диапазон портов для WebRTC ICE
+CMD ["mumble-web-proxy", "--listen-ws", "64737", "--server", "rt-mumble:64738", "--ice-port-min", "20000", "--ice-port-max", "21000"]

@@ -64,12 +64,27 @@ podman images rt-mumble-web-proxy:latest --format "{{.Size}}"
 
 # Запустите контейнер
 podman run -d --name rt-mumble-proxy \
-  -p 1337:1337 -p 64737:64737/udp \
+  -p 64737:64737/tcp \
+  -p 20000-21000:20000-21000/udp \
   rt-mumble-web-proxy:latest
 
 # Проверьте логи
 podman logs rt-mumble-proxy
+
+# Должно быть:
+# Listening on 0.0.0.0:64737
+# Connecting to Mumble server at rt-mumble:64738
 ```
+
+### Параметры mumble-web-proxy
+
+Dockerfile уже содержит необходимые параметры:
+- `--listen-ws 64737` — порт для WebSocket сервера
+- `--server rt-mumble:64738` — адрес Mumble сервера
+- `--ice-port-min 20000` — минимальный порт для WebRTC ICE
+- `--ice-port-max 21000` — максимальный порт для WebRTC ICE
+
+Подробная документация: [infra/MUMBLE-PROXY-SETUP.md](infra/MUMBLE-PROXY-SETUP.md)
 
 ## Решение проблемы сборки
 
