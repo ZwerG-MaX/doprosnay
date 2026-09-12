@@ -1,0 +1,18 @@
+[Unit]
+Description=Nextcloud — хранилище документов (SQLite)
+After=rt-dopros-net.network rt-dopros-cloud-data.volume
+Requires=rt-dopros-net.network rt-dopros-cloud-data.volume
+
+[Container]
+Image=docker.io/library/nextcloud:apache
+ContainerName=rt-cloud
+Environment=NEXTCLOUD_ADMIN_USER=admin
+Environment=NEXTCLOUD_ADMIN_PASSWORD=rt-cloud-2026
+Environment=NEXTCLOUD_TRUSTED_DOMAINS=cloud.local localhost
+Environment=NEXTCLOUD_DEFAULT_PHONE_REGION=RU
+Volume=rt-dopros-cloud-data.volume:/var/www/html:Z
+Network=rt-dopros-net.network
+PublishPort=8090:80
+
+[Install]
+WantedBy=default.target

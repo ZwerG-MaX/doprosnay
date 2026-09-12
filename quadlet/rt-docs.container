@@ -1,0 +1,16 @@
+[Unit]
+Description=ONLYOFFICE Document Server
+After=rt-dopros-net.network rt-dopros-docs-data.volume
+Requires=rt-dopros-net.network rt-dopros-docs-data.volume
+
+[Container]
+Image=docker.io/onlyoffice/documentserver:latest
+ContainerName=rt-docs
+Environment=JWT_ENABLED=false
+Environment=JWT_SECRET=rt-docs-secret-change-me
+Volume=rt-dopros-docs-data.volume:/var/www/onlyoffice/Data:Z
+Network=rt-dopros-net.network
+PublishPort=8080:80
+
+[Install]
+WantedBy=default.target
