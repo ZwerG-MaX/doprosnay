@@ -136,6 +136,23 @@ podman build -t rt-pult:latest -f Dockerfile .
 podman build -t rt-mumble-web-proxy:latest -f infra/mumble-web-proxy.Dockerfile infra/
 ```
 
+### Ошибка сборки mumble-web-proxy (openssl-sys)
+
+Если при сборке `rt-mumble-web-proxy` возникает ошибка с `openssl-sys`:
+
+**Быстрое решение:** Используйте обновлённый Dockerfile (уже включён):
+```bash
+podman build -t rt-mumble-web-proxy:latest -f infra/mumble-web-proxy.Dockerfile infra/
+```
+
+**Если не помогает:** Пропустите mumble-web-proxy:
+```bash
+rm ~/.config/containers/systemd/rt-mumble-proxy.container
+systemctl --user daemon-reload
+```
+
+Подробная документация: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+
 ### Порты заняты
 
 Измените порты в соответствующих `.container` файлах в `~/.config/containers/systemd/`:

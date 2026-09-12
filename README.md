@@ -72,6 +72,42 @@ npm run dev          # http://localhost:5173
 → `nginx:1.27-alpine` (SPA-фолбэк, gzip, кэш ассетов). Пересобрать образ пульта:
 `docker compose build frontend`.
 
+### Развёртывание через Podman Quadlet (systemd)
+
+Для production-развёртывания с автозапуском и rootless-режимом:
+
+```bash
+# Автоматическая установка
+chmod +x quadlet/install-quadlet.sh
+./quadlet/install-quadlet.sh install
+
+# Запуск стека
+systemctl --user start rt-dopros.target
+
+# Включить автозапуск при загрузке
+systemctl --user enable rt-dopros.target
+```
+
+**Преимущества Quadlet:**
+- Rootless-режим (без root-прав)
+- Автозапуск при загрузке системы
+- Интеграция с systemd (`systemctl`, `journalctl`)
+- Автоматический порядок запуска сервисов
+
+**Troubleshooting mumble-web-proxy:**
+
+Если при сборке возникает ошибка с `openssl-sys`:
+```bash
+# Используйте обновлённый Dockerfile
+podman build -t rt-mumble-web-proxy:latest -f infra/mumble-web-proxy.Dockerfile infra/
+
+# Или пропустите mumble-web-proxy, если не нужен веб-интерфейс Mumble
+rm ~/.config/containers/systemd/rt-mumble-proxy.container
+systemctl --user daemon-reload
+```
+
+Подробная документация: [QUADLET.md](QUADLET.md), [TROUBLESHOOTING.md](quadlet/TROUBLESHOOTING.md)
+
 ---
 
 ## Настройка пульта (админ → «СЕРВЕРЫ»)

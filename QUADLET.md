@@ -222,6 +222,23 @@ journalctl --user -u rt-db.service -f
 podman exec -it rt-db sh
 ```
 
+### Проблемы со сборкой mumble-web-proxy
+
+Если при сборке образа `rt-mumble-web-proxy` возникает ошибка с `openssl-sys`:
+
+**Решение 1:** Используйте обновлённый Dockerfile (уже включён в проект):
+```bash
+podman build -t rt-mumble-web-proxy:latest -f infra/mumble-web-proxy.Dockerfile infra/
+```
+
+**Решение 2:** Пропустите mumble-web-proxy, если не нужен веб-интерфейс Mumble:
+```bash
+rm ~/.config/containers/systemd/rt-mumble-proxy.container
+systemctl --user daemon-reload
+```
+
+Подробная документация: [TROUBLESHOOTING.md](quadlet/TROUBLESHOOTING.md)
+
 ## Отличия от docker-compose
 
 | docker-compose | Quadlet |
