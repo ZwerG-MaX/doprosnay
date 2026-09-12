@@ -1,0 +1,27 @@
+# Альтернативный Dockerfile для mumble-web-proxy
+# Использует готовый бинарник из GitHub releases для быстрого развёртывания
+
+FROM debian:bullseye-slim
+
+# Устанавливаем runtime зависимости
+RUN apt-get update && apt-get install -y \
+    wget \
+    ca-certificates \
+    libssl1.1 \
+    libopus0 \
+    libogg0 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Скачиваем готовый бинарник из GitHub releases
+# Версия 0.5.0 - последняя стабильная на момент создания
+RUN wget -q https://github.com/Johni0702/mumble-web-proxy/releases/download/v0.5.0/mumble-web-proxy \
+    -O /usr/local/bin/mumble-web-proxy \
+    && chmod +x /usr/local/bin/mumble-web-proxy
+
+# 1337 — WebSocket (через nginx/Traefik на mumble-web)
+# 64737 — UDP для WebRTC-медиа (пробрасывается напрямую)
+EXPOSE 1337/tcp 64737/udp
+
+CMD ["mumble-web-proxy"]

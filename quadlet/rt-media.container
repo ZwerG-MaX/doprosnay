@@ -1,0 +1,17 @@
+[Unit]
+Description=MediaMTX — медиа-прокси для видеопотоков
+After=rt-dopros-net.network
+Requires=rt-dopros-net.network
+
+[Container]
+Image=docker.io/bluenviron/mediamtx:latest
+ContainerName=rt-media
+Volume=./infra/mediamtx.yml:/mediamtx.yml:ro,Z
+Network=rt-dopros-net.network
+PublishPort=8554:8554
+PublishPort=8888:8888
+PublishPort=8889:8889
+PublishPort=8890:8890/udp
+
+[Install]
+WantedBy=default.target

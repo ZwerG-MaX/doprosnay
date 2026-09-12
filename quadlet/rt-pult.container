@@ -1,0 +1,19 @@
+[Unit]
+Description=Пульт наблюдения — frontend
+After=rt-traefik.service rt-dopros-net.network
+Requires=rt-traefik.service rt-dopros-net.network
+
+[Container]
+Image=rt-pult:latest
+ContainerName=rt-pult
+# Предварительная сборка:
+#   podman build -t rt-pult -f Dockerfile .
+Network=rt-dopros-net.network
+PublishPort=8082:80
+
+[Service]
+# Для Traefik-интеграции нужны labels, но Quadlet не поддерживает их напрямую
+# Используйте Podman network aliases или настройте Traefik вручную
+
+[Install]
+WantedBy=default.target

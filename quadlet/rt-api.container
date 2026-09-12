@@ -1,0 +1,18 @@
+[Unit]
+Description=PostgREST — REST API поверх PostgreSQL
+After=rt-db.service rt-dopros-net.network
+Requires=rt-db.service rt-dopros-net.network
+
+[Container]
+Image=docker.io/postgrest/postgrest:v12.2.3
+ContainerName=rt-api
+Environment=PGRST_DB_URI=postgres://pult:pult-db-2026@rt-db:5432/pult
+Environment=PGRST_DB_SCHEMAS=public
+Environment=PGRST_DB_ANON_ROLE=pult_anon
+Environment=PGRST_SERVER_PORT=3000
+Environment=PGRST_SERVER_CORS_ALLOWED_ORIGINS=*
+Network=rt-dopros-net.network
+PublishPort=3000:3000
+
+[Install]
+WantedBy=default.target

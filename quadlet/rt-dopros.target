@@ -1,0 +1,7 @@
+[Unit]
+Description=Пульт наблюдения «Допросная» — весь стек
+After=rt-db.service rt-api.service rt-docs.service rt-cloud.service rt-mumble.service rt-mumble-proxy.service rt-mumble-web.service rt-media.service rt-traefik.service rt-pult.service
+Wants=rt-db.service rt-api.service rt-docs.service rt-cloud.service rt-mumble.service rt-mumble-proxy.service rt-mumble-web.service rt-media.service rt-traefik.service rt-pult.service
+
+[Install]
+WantedBy=default.target

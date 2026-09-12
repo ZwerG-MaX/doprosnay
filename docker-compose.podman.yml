@@ -1,0 +1,216 @@
+# ═══════════════════════════════════════════════════════════════
+#  Пульт наблюдения «Допросная №2» · стек через Traefik · PODMAN
+#
+#  Отличия от docker-compose.yml:
+#    · Traefik получает Podman-сокет (Docker-совместимый API)
+#      вместо /var/run/docker.sock — путь задаётся переменной
+#      PODMAN_SOCK (для rootful по умолчанию /run/podman/podman.sock,
+#      для rootless укажите $XDG_RUNTIME_DIR/podman/podman.sock в .env)
+#    · PostgreSQL получает shm_size 256mb — иначе initdb падает
+#      в rootless-режиме (малый /dev/shm по умолчанию)
+#
+#  Требования: Podman ≥ 4.2 + podman-compose (или `podman compose`)
+#
+#  Сокет (rootful):   systemctl enable --now podman.socket
+#  Сокет (rootless):  systemctl --user enable --now podman.socket
+#                     затем в .env: PODMAN_SOCK=$XDG_RUNTIME_DIR/podman/podman.sock
+#
+#  Домены (/etc/hosts):
+#    127.0.0.1  pult.local docs.local cloud.local mumble.local api.local
+#
+#  Поднять всё:   podman compose -f docker-compose.podman.yml up -d --build
+#                 (или: make up ENGINE=podman)
+# ═══════════════════════════════════════════════════════════════
+
+services:
+  # ── Traefik: единая точка входа, маршрутизация по доменам ──
+  traefik:
+    image: traefik:v3.1
+    container_name: rt-traefik
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"                 # дев-режим: дашборд на :8080
+      - "--log.level=INFO"
+    ports:
+      - "80:80"
+      - "8080:8080"                           # Traefik dashboard (только dev!)
+    volumes:
+      # Podman-сокет пробрасывается как docker.sock — Traefik работает
+      # с ним через Docker-совместимый REST API
+      - ${PODMAN_SOCK:-/run/podman/podman.sock}:/var/run/docker.sock:ro
+    restart: unless-stopped
+
+  # ── PostgreSQL: пользователи, права, конфиг, шаблоны, протоколы, аудит ──
+  db:
+    image: postgres:16-alpine
+    container_name: rt-db
+    environment:
+      POSTGRES_USER: pult
+      POSTGRES_PASSWORD: pult-db-2026
+      POSTGRES_DB: pult
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./infra/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    shm_size: 256mb                           # обязательно для rootless
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pult -d pult"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ── PostgREST: автоматический REST API поверх PostgreSQL ──
+  api:
+    image: postgrest/postgrest:v12.2.3
+    container_name: rt-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://pult:pult-db-2026@db:5432/pult
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: pult_anon
+      PGRST_SERVER_PORT: "3000"
+      PGRST_SERVER_CORS_ALLOWED_ORIGINS: "*"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.local`)"
+      - "traefik.http.routers.api.entrypoints=web"
+      - "traefik.http.services.api.loadbalancer.server.port=3000"
+    restart: unless-stopped
+
+  # ── Пульт наблюдения (собирается из Dockerfile) ──
+  frontend:
+    build: .
+    container_name: rt-pult
+    depends_on:
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pult.rule=Host(`pult.local`) || Host(`localhost`) || Host(`127.0.0.1`)"
+      - "traefik.http.routers.pult.entrypoints=web"
+      - "traefik.http.services.pult.loadbalancer.server.port=80"
+    restart: unless-stopped
+
+  # ── ONLYOFFICE Document Server ──
+  docs:
+    image: onlyoffice/documentserver:latest
+    container_name: rt-docs
+    environment:
+      JWT_ENABLED: "false"
+      JWT_SECRET: "rt-docs-secret-change-me"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.docs.rule=Host(`docs.local`)"
+      - "traefik.http.routers.docs.entrypoints=web"
+      - "traefik.http.services.docs.loadbalancer.server.port=80"
+    volumes:
+      - docs_data:/var/www/onlyoffice/Data
+      - docs_log:/var/log/onlyoffice
+      - docs_cache:/var/lib/onlyoffice
+    restart: unless-stopped
+
+  # ── Nextcloud: минимальное хранилище документов (SQLite, apache) ──
+  cloud:
+    image: nextcloud:apache
+    container_name: rt-cloud
+    environment:
+      NEXTCLOUD_ADMIN_USER: admin
+      NEXTCLOUD_ADMIN_PASSWORD: rt-cloud-2026
+      NEXTCLOUD_TRUSTED_DOMAINS: "cloud.local localhost"
+      NEXTCLOUD_DEFAULT_PHONE_REGION: "RU"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cloud.rule=Host(`cloud.local`)"
+      - "traefik.http.routers.cloud.entrypoints=web"
+      - "traefik.http.services.cloud.loadbalancer.server.port=80"
+    volumes:
+      - cloud_data:/var/www/html
+    restart: unless-stopped
+
+  # ── Mumble (Murmur): голосовой сервер ──
+  mumble:
+    image: mumblevoip/mumble-server:latest
+    container_name: rt-mumble
+    environment:
+      MUMBLE_SUPERUSER_PASSWORD: "rt-mumble-2026"
+      MUMBLE_CONFIG_WELCOMETEXT: "Пульт наблюдения · Допросная · СКИТ"
+    ports:
+      - "64738:64738/tcp"
+      - "64738:64738/udp"
+    volumes:
+      - mumble_data:/data
+    restart: unless-stopped
+
+  # ── Аудиоконсоль: mumble-web + WebSocket/WebRTC-прокси ──
+  mumble-web-proxy:
+    build:
+      context: ./infra
+      dockerfile: mumble-web-proxy.Dockerfile
+    container_name: rt-mumble-proxy
+    depends_on:
+      - mumble
+    ports:
+      - "64737:64737/udp"
+    restart: unless-stopped
+
+  mumble-web:
+    image: leoverto/mumble-web:latest
+    container_name: rt-mumble-web
+    depends_on:
+      - mumble-web-proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mumble.rule=Host(`mumble.local`)"
+      - "traefik.http.routers.mumble.entrypoints=web"
+      - "traefik.http.services.mumble.loadbalancer.server.port=80"
+    restart: unless-stopped
+
+  # ── MediaMTX: мост «VMS (RTSP) → WebRTC/HLS» для браузера ──
+  media:
+    image: bluenviron/mediamtx:latest
+    container_name: rt-media
+    depends_on:
+      - vms-demo
+    volumes:
+      - ./infra/mediamtx.yml:/mediamtx.yml:ro
+    ports:
+      - "8554:8554"
+      - "8888:8888"
+      - "8889:8889"
+      - "8890:8890/udp"
+    restart: unless-stopped
+
+  # ── Демо-VMS: эмулятор MACROSCOP (3 тестовых RTSP-потока) ──
+  vms-demo:
+    image: jrottenberg/ffmpeg:6.1-alpine
+    container_name: rt-vms-demo
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        ffmpeg -re -f lavfi -i testsrc2=size=1280x720:rate=25 \
+          -c:v libx264 -preset ultrafast -tune zerolatency -g 50 -pix_fmt yuv420p \
+          -f rtsp rtsp://0.0.0.0:8554/cam01 &
+        ffmpeg -re -f lavfi -i testsrc2=size=1920x1080:rate=25 \
+          -c:v libx264 -preset ultrafast -tune zerolatency -g 50 -pix_fmt yuv420p \
+          -f rtsp rtsp://0.0.0.0:8555/cam02 &
+        ffmpeg -re -f lavfi -i smptebars=size=1280x720:rate=25 \
+          -c:v libx264 -preset ultrafast -tune zerolatency -g 50 -pix_fmt yuv420p \
+          -f rtsp rtsp://0.0.0.0:8556/cam03 &
+        wait
+    ports:
+      - "9554:8554"
+      - "9555:8555"
+      - "9556:8556"
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  docs_data:
+  docs_log:
+  docs_cache:
+  cloud_data:
+  mumble_data:

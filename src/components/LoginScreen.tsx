@@ -1,0 +1,419 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useStore } from "../lib/store";
+import { probeAll } from "../lib/probe";
+import { RtMark, IcCam, IcRadio, IcFile, IcDb, IcRefresh } from "./Icons";
+
+type ServerKey = "macroscop" | "mumble" | "onlyoffice" | "pg";
+type St = "checking" | "online" | "offline";
+
+const strip = (u: string) => u.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+
+export function LoginScreen() {
+  const { login, config, users, createUser } = useStore();
+  const [loginStr, setLoginStr] = useState("");
+  const [pwd, setPwd] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
+
+  /* ── состояние формы создания первого администратора ── */
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [firstLogin, setFirstLogin] = useState("");
+  const [firstPwd, setFirstPwd] = useState("");
+  const [createBusy, setCreateBusy] = useState(false);
+
+  /* ── цели опроса четырёх серверов ── */
+  const targets = useMemo(
+    () => [
+      {
+        key: "macroscop" as ServerKey,
+        icon: IcCam,
+        tone: "text-hud",
+        glow: "rgba(0,176,240,0.28)",
+        name: "RT-VIDEO",
+        sub: `видеостена · ${strip(config.macroscop.host)}`,
+        url: "http://localhost:8888/v3/paths/list",
+        cors: false,
+      },
+      {
+        key: "mumble" as ServerKey,
+        icon: IcRadio,
+        tone: "text-amber",
+        glow: "rgba(255,138,61,0.28)",
+        name: "RT-AUDIO",
+        sub: `аудиоканал · ${config.mumble.host}:${config.mumble.port}`,
+        url: config.mumble.webUrl,
+        cors: false,
+      },
+      {
+        key: "onlyoffice" as ServerKey,
+        icon: IcFile,
+        tone: "text-live",
+        glow: "rgba(49,217,138,0.28)",
+        name: "RT-DOCS",
+        sub: `документы · ${strip(config.onlyoffice.dsUrl)}`,
+        url: `${config.onlyoffice.dsUrl.replace(/\/+$/, "")}/healthcheck`,
+        cors: false,
+      },
+      {
+        key: "pg" as ServerKey,
+        icon: IcDb,
+        tone: "text-violet",
+        glow: "rgba(122,92,245,0.3)",
+        name: "RT-DB",
+        sub: `данные · ${strip(config.backend.apiUrl)}`,
+        url: `${config.backend.apiUrl.replace(/\/+$/, "")}/users?select=id&limit=1`,
+        cors: true,
+      },
+    ],
+    [config],
+  );
+
+  const [status, setStatus] = useState<Record<ServerKey, { st: St; ms: number | null }>>(() =>
+    Object.fromEntries(targets.map((t) => [t.key, { st: "checking", ms: null }])) as Record<
+      ServerKey,
+      { st: St; ms: number | null }
+    >,
+  );
+  const [busy, setBusy] = useState(false);
+
+  const run = useCallback(() => {
+    setBusy(true);
+    setStatus(
+      Object.fromEntries(targets.map((t) => [t.key, { st: "checking", ms: null }])) as Record<
+        ServerKey,
+        { st: St; ms: number | null }
+      >,
+    );
+    probeAll(targets, (key, r) => {
+      setStatus((prev) => ({
+        ...prev,
+        [key]: { st: r.online ? "online" : "offline", ms: r.latencyMs },
+      }));
+    }).finally(() => setBusy(false));
+  }, [targets]);
+
+  useEffect(() => {
+    run();
+  }, [run]);
+
+  const onlineCount = targets.filter((t) => status[t.key]?.st === "online").length;
+
+  const submit = async () => {
+    if (!loginStr.trim() || !pwd) {
+      setErr("Введите логин и пароль");
+      window.setTimeout(() => setErr(null), 2600);
+      return;
+    }
+    setAuthBusy(true);
+    setErr(null);
+    const u = await login(loginStr, pwd);
+    setAuthBusy(false);
+    if (!u) {
+      setErr("Неверный логин или пароль");
+      window.setTimeout(() => setErr(null), 2600);
+    }
+  };
+
+  const submitFirstAdmin = () => {
+    const fullName = `${lastName} ${firstName}`.trim();
+    const login = firstLogin.trim().toLowerCase();
+    if (!fullName || !login || !firstPwd) {
+      setErr("Заполните все поля");
+      window.setTimeout(() => setErr(null), 2600);
+      return;
+    }
+    if (firstPwd.length < 4) {
+      setErr("Пароль должен быть не менее 4 символов");
+      window.setTimeout(() => setErr(null), 2600);
+      return;
+    }
+    setCreateBusy(true);
+    setErr(null);
+    try {
+      createUser({
+        name: fullName,
+        login,
+        password: firstPwd,
+        title: "администратор",
+        isAdmin: true,
+        color: "#00b0f0",
+        view: [],
+        edit: [],
+      });
+      setCreateBusy(false);
+    } catch {
+      setErr("Ошибка создания администратора");
+      setCreateBusy(false);
+      window.setTimeout(() => setErr(null), 2600);
+    }
+  };
+
+  return (
+    <div className="grid min-h-screen lg:grid-cols-[1.05fr_1fr]">
+      {/* ── левая брендовая панель ── */}
+      <aside className="relative hidden overflow-hidden border-r border-line bg-panel/60 lg:flex lg:flex-col">
+        <div className="pointer-events-none absolute inset-0 opacity-[0.35]">
+          <div className="absolute -left-24 -top-24 h-80 w-80 rounded-full bg-violet/20 blur-3xl" />
+          <div className="absolute -bottom-28 right-0 h-96 w-96 rounded-full bg-hud/15 blur-3xl" />
+        </div>
+
+        <div className="relative flex items-center gap-3.5 px-10 pt-10">
+          <RtMark className="h-12 w-12" />
+          <div>
+            <div className="font-display text-[22px] font-extrabold uppercase leading-none tracking-[0.08em] text-fg">
+              СКИТ
+            </div>
+            <div className="mt-1.5 font-mono text-[10px] tracking-[0.3em] text-dim">
+              ДОПРОСНАЯ
+            </div>
+          </div>
+        </div>
+
+        <div className="rt-stripe relative mx-10 mt-7" />
+
+        {/* ── живой статус сервисов ── */}
+        <div className="relative mx-10 mt-8 flex min-h-0 flex-1 flex-col">
+          <div className="mb-3 flex items-center gap-2.5">
+            <span className="font-display text-[11px] tracking-[0.22em] text-dim">СТАТУС СЕРВИСОВ</span>
+            <span
+              className={`rounded-full border px-2 py-0.5 font-mono text-[9.5px] tabular-nums transition-colors ${
+                onlineCount === targets.length
+                  ? "border-live/50 bg-live/10 text-live"
+                  : onlineCount === 0
+                    ? "border-rec/50 bg-rec/10 text-rec"
+                    : "border-amber/50 bg-amber/10 text-amber"
+              }`}
+            >
+              {onlineCount}/{targets.length}
+            </span>
+            <button
+              onClick={run}
+              disabled={busy}
+              title="Повторить опрос серверов"
+              className="ml-auto grid h-7 w-7 place-items-center rounded-md border border-line bg-panel2 text-dim transition-all hover:border-hud/60 hover:text-hud active:scale-90 disabled:opacity-50"
+            >
+              <IcRefresh className={`h-3.5 w-3.5 ${busy ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+
+          <div className="space-y-2.5">
+            {targets.map((t, i) => {
+              const s = status[t.key] ?? { st: "checking" as St, ms: null };
+              return (
+                <div
+                  key={t.key}
+                  className="rise group relative flex items-center gap-3.5 overflow-hidden rounded-lg border border-line bg-panel2/70 px-4 py-3 transition-all duration-200 hover:border-line2"
+                  style={{ animationDelay: `${i * 110}ms` }}
+                >
+                  {/* цветовая кромка слева при онлайне */}
+                  <span
+                    className={`absolute inset-y-0 left-0 w-[3px] transition-opacity duration-300 ${
+                      s.st === "online" ? "opacity-100" : "opacity-0"
+                    }`}
+                    style={{ background: t.glow.replace("0.28", "1").replace("0.3", "1") }}
+                  />
+                  <span
+                    className={`grid h-9 w-9 shrink-0 place-items-center rounded-md border border-line bg-panel transition-shadow duration-300 ${t.tone}`}
+                    style={s.st === "online" ? { boxShadow: `0 0 14px ${t.glow}` } : undefined}
+                  >
+                    <t.icon className="h-4.5 w-4.5" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className={`truncate font-display text-[11px] tracking-[0.16em] ${s.st === "offline" ? "text-faint" : "text-fg"}`}>
+                      {t.name}
+                    </div>
+                    <div className="truncate font-mono text-[9.5px] tracking-wider text-faint">{t.sub}</div>
+                  </div>
+
+                  {/* индикатор состояния */}
+                  <div className="ml-auto flex shrink-0 flex-col items-end gap-0.5">
+                    {s.st === "checking" && (
+                      <span className="flex items-center gap-1.5 font-mono text-[9px] tracking-widest text-amber">
+                        <span className="led blink-rec bg-amber shadow-[0_0_7px_rgba(255,138,61,0.9)]" />
+                        ОПРОС…
+                      </span>
+                    )}
+                    {s.st === "online" && (
+                      <span className="flex items-center gap-1.5 font-mono text-[9px] tracking-widest text-live">
+                        <span className="led bg-live shadow-[0_0_7px_rgba(49,217,138,0.9)]" />
+                        ОНЛАЙН
+                      </span>
+                    )}
+                    {s.st === "offline" && (
+                      <span className="flex items-center gap-1.5 font-mono text-[9px] tracking-widest text-rec">
+                        <span className="led bg-rec shadow-[0_0_7px_rgba(255,77,94,0.9)]" />
+                        ОФЛАЙН
+                      </span>
+                    )}
+                    <span className="font-mono text-[8.5px] tabular-nums text-faint">
+                      {s.st === "online" && s.ms !== null ? `${s.ms} мс` : s.st === "offline" ? "нет ответа" : "…"}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <p className="mt-auto pb-2 pt-4 font-mono text-[8.5px] leading-relaxed tracking-wider text-faint">
+            опрос выполняется из браузера · видеопоток проверяется через MediaMTX ·
+            PostgreSQL — через PostgREST
+          </p>
+        </div>
+
+        <div className="relative flex items-center justify-between px-10 py-5 font-mono text-[9.5px] tracking-wider text-faint">
+          <span>пульт наблюдения · пост 7 · смена Б</span>
+          <span>канал защищён · ФСТЭК-Б</span>
+        </div>
+        <div className="rt-stripe" />
+      </aside>
+
+      {/* ── форма входа / создания первого админа ── */}
+      <main className={`flex items-center justify-center p-5 ${err ? "shake" : ""}`}>
+        <div className="rise w-full max-w-[520px]">
+          <div className="mb-5 flex items-center gap-3 lg:hidden">
+            <RtMark className="h-9 w-9" />
+            <span className="font-display text-lg font-extrabold uppercase tracking-wide">СКИТ</span>
+          </div>
+
+          {users.length === 0 ? (
+            <>
+              <h1 className="display-s-strong font-display uppercase tracking-wide text-fg">
+                <span className="rt-grad-text">Первый запуск</span>
+              </h1>
+              <p className="body-m mt-2 text-dim">
+                Создайте первого администратора системы. После этого вы сможете войти и управлять пользователями.
+              </p>
+
+              {/* сообщение об ошибке */}
+              {err && (
+                <div className="mt-4 flex items-center gap-2 rounded-lg border border-rec/50 bg-rec/10 px-3.5 py-2.5 font-mono text-[11px] tracking-wide text-rec">
+                  <span className="led bg-rec shadow-[0_0_7px_rgba(255,77,94,0.9)]" />
+                  {err}
+                </div>
+              )}
+
+              {/* фамилия */}
+              <label className="mt-5 block">
+                <span className="mb-1.5 block font-mono text-[10px] tracking-[0.22em] text-faint">ФАМИЛИЯ *</span>
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Иванов"
+                  className="rt-input body-m"
+                />
+              </label>
+
+              {/* имя */}
+              <label className="mt-3 block">
+                <span className="mb-1.5 block font-mono text-[10px] tracking-[0.22em] text-faint">ИМЯ *</span>
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="Иван"
+                  className="rt-input body-m"
+                />
+              </label>
+
+              {/* логин */}
+              <label className="mt-3 block">
+                <span className="mb-1.5 block font-mono text-[10px] tracking-[0.22em] text-faint">ЛОГИН *</span>
+                <input
+                  type="text"
+                  value={firstLogin}
+                  onChange={(e) => setFirstLogin(e.target.value)}
+                  placeholder="ivanov"
+                  className="rt-input body-m lowercase"
+                />
+              </label>
+
+              {/* пароль */}
+              <label className="mt-3 block">
+                <span className="mb-1.5 block font-mono text-[10px] tracking-[0.22em] text-faint">ПАРОЛЬ * (мин. 4 символа)</span>
+                <input
+                  type="password"
+                  value={firstPwd}
+                  onChange={(e) => setFirstPwd(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && submitFirstAdmin()}
+                  placeholder="••••••"
+                  className="rt-input body-m"
+                />
+              </label>
+
+              <button
+                onClick={submitFirstAdmin}
+                disabled={createBusy || !lastName.trim() || !firstName.trim() || !firstLogin.trim() || !firstPwd}
+                className="rt-grad-bg mt-5 flex h-12 w-full items-center justify-center gap-2.5 rounded-lg font-display text-[13px] font-bold tracking-[0.2em] text-white transition-all hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35 disabled:saturate-50"
+              >
+                {createBusy ? "СОЗДАНИЕ…" : "СОЗДАТЬ АДМИНИСТРАТОРА"}
+              </button>
+
+              <p className="mt-3 text-center font-mono text-[9.5px] leading-relaxed tracking-wide text-faint">
+                Первый администратор получит полный доступ ко всем функциям системы
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="display-s-strong font-display uppercase tracking-wide text-fg">
+                Вход в <span className="rt-grad-text">пульт наблюдения</span>
+              </h1>
+              <p className="body-m mt-2 text-dim">
+                Введите логин и пароль. Учётные записи и права назначает администратор.
+              </p>
+
+              {/* сообщение об ошибке */}
+              {err && (
+                <div className="mt-4 flex items-center gap-2 rounded-lg border border-rec/50 bg-rec/10 px-3.5 py-2.5 font-mono text-[11px] tracking-wide text-rec">
+                  <span className="led bg-rec shadow-[0_0_7px_rgba(255,77,94,0.9)]" />
+                  {err}
+                </div>
+              )}
+
+              {/* логин */}
+              <label className="mt-5 block">
+                <span className="mb-1.5 block font-mono text-[10px] tracking-[0.22em] text-faint">ЛОГИН</span>
+                <input
+                  type="text"
+                  autoComplete="username"
+                  value={loginStr}
+                  onChange={(e) => setLoginStr(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && submit()}
+                  placeholder="например, skit"
+                  className="rt-input body-m lowercase"
+                />
+              </label>
+
+              {/* пароль */}
+              <label className="mt-3 block">
+                <span className="mb-1.5 block font-mono text-[10px] tracking-[0.22em] text-faint">ПАРОЛЬ</span>
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={pwd}
+                  onChange={(e) => setPwd(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && submit()}
+                  placeholder="••••••"
+                  className="rt-input body-m"
+                />
+              </label>
+
+              <button
+                onClick={submit}
+                disabled={authBusy || !loginStr.trim() || !pwd}
+                className="rt-grad-bg mt-5 flex h-12 w-full items-center justify-center gap-2.5 rounded-lg font-display text-[13px] font-bold tracking-[0.2em] text-white transition-all hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-35 disabled:saturate-50"
+              >
+                {authBusy ? "ПРОВЕРКА…" : "ВОЙТИ В СИСТЕМУ"}
+              </button>
+
+              <p className="mt-3 text-center font-mono text-[9.5px] leading-relaxed tracking-wide text-faint">
+                Учётные записи создаются администратором в панели «Доступ»
+              </p>
+            </>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}

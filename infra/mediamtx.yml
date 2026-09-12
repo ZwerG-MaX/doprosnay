@@ -1,0 +1,42 @@
+# MediaMTX: мост «VMS (RTSP) → браузер (WebRTC / HLS)»
+#
+# ── Источники ────────────────────────────────────────────────────
+# По умолчанию source указывает на демо-VMS (сервис vms-demo в docker-compose),
+# который отдаёт тестовые RTSP-таблицы с таймкодом.
+#
+# MediaMTX не привязан к конкретной VMS: подойдёт ЛЮБАЯ система, отдающая RTSP
+# (MACROSCOP, TRASSIR, Hikvision, Dahua, Blue Iris, go2rtc/Frigate, отдельные
+# IP-камеры — см. таблицу в README, раздел «Совместимость: любая VMS с RTSP»).
+# Замените каждый source на RTSP-адрес вашего источника, например:
+#   rtsp://vms:554/macroscop/cam01_main            (MACROSCOP)
+#   rtsp://trassir:554/cam01                        (TRASSIR)
+#   rtsp://user:pass@ip:554/Streaming/Channels/101  (Hikvision / камера)
+# (внутри сети контейнеров — IP/имя хоста VMS, не localhost).
+# Если VMS умеет только «пушить» поток — MediaMTX может принять публикацию:
+#   source: publisher  (камера/VMS пишет в rtsp://media:8554/cam01).
+#
+# ── Чтение потоков из браузера ───────────────────────────────────
+#   WebRTC (минимальная задержка): http://localhost:8889/cam01
+#   HLS (совместимость):           http://localhost:8888/cam01
+#
+# В коде пульта (src/components/CameraFeed.tsx) замените <img> на <video>
+# с WebRTC-подключением через MediaMTX WHEP API: POST http://localhost:8888/cam01/whep
+
+paths:
+  cam01:
+    source: rtsp://vms-demo:8554/cam01
+  cam02:
+    source: rtsp://vms-demo:8555/cam02
+  cam03:
+    source: rtsp://vms-demo:8556/cam03
+
+# ── общие настройки ──────────────────────────────────────────────
+webrtcAddress: :8889
+hlsAddress: :8888
+rtspAddress: :8554
+
+# Медиа-порт WebRTC (UDP) должен совпадать с пробросом в compose (8890)
+webrtcUDPAddress: :8890
+
+# При необходимости — логи для отладки:
+logLevel: info
