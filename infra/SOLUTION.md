@@ -22,9 +22,19 @@ cargo:warning=build/expando.c:4:24: error: pasting "RUST_VERSION_OPENSSL_" and "
 - Rust 1.89
 - Исправленными проблемами совместимости
 
-### Сборка из форка
+### Сборка из форка (Multi-stage Dockerfile)
 
 **Dockerfile:** `infra/mumble-web-proxy.Dockerfile`
+
+Используем multi-stage сборку:
+- **Этап 1 (builder):** Компиляция из форка с использованием зависимостей из репозитория
+  - Образ: `rust:1.89-bookworm`
+  - Нативные зависимости из README репозитория: `build-essential`, `pkg-config`, `clang`, `libclang-dev`, `libnice-dev`, `libglib2.0-dev`, `libssl-dev`
+  - Команда сборки: `cargo build --workspace --release`
+- **Этап 2 (runtime):** Лёгкий Alpine образ для runtime (~50-80 MB)
+  - Образ: `alpine:3.19`
+  - Runtime зависимости: `libnice`, `glib`, `openssl`, `opus`, `libogg`
+  - Копируется только бинарник из builder
 
 ```bash
 cd infra/
@@ -37,7 +47,9 @@ podman build -t rt-mumble-web-proxy:latest -f mumble-web-proxy.Dockerfile .
 - ✅ Совместимость с OpenSSL 3.x (Debian Bookworm, Ubuntu 22.04+)
 - ✅ Rust 1.89 с новыми функциями
 - ✅ Обновлённые зависимости
-- ✅ Не требует Debian Bullseye
+- ✅ Лёгкий Alpine образ для runtime (~50-80 MB вместо ~800 MB)
+- ✅ Использует Dockerfile из репозитория для компиляции
+- ✅ Минимальный размер финального образа
 
 ### Альтернативные варианты
 

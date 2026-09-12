@@ -1,38 +1,58 @@
-# mumble-web-proxy: мост Mumble ⇄ WebSocket/WebRTC для браузера
-# Используем форк с обновлёнными зависимостями: https://github.com/ZwerG-MaX/mumble-web-proxy-rust-1.89
+# Multi-stage Dockerfile для mumble-web-proxy
+# Этап 1: Компиляция из форка https://github.com/ZwerG-MaX/mumble-web-proxy-rust-1.89
+# Этап 2: Лёгкий Alpine образ для runtime
 
-FROM rust:1.89-bookworm AS build
+# ═══════════════════════════════════════════════════════════════
+# ЭТАП 1: Сборка (используем зависимости из репозитория)
+# ═══════════════════════════════════════════════════════════════
+FROM rust:1.89-bookworm AS builder
 
-# Устанавливаем зависимости для компиляции
-RUN apt-get update && apt-get install -y \
-    git \
+# Нативные зависимости для компиляции (из README репозитория)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
     pkg-config \
+    clang \
+    libclang-dev \
+    libnice-dev \
+    libglib2.0-dev \
     libssl-dev \
     libopus-dev \
     libogg-dev \
+    ca-certificates \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
 
 # Клонируем форк с обновлёнными зависимостями
-RUN git clone --depth 1 https://github.com/ZwerG-MaX/mumble-web-proxy-rust-1.89.git . \
-    && cargo build --release
+RUN git clone --depth 1 https://github.com/ZwerG-MaX/mumble-web-proxy-rust-1.89.git .
 
-# Финальный образ на основе Debian Bookworm slim
-FROM debian:bookworm-slim
+# Выполняем сборку (как в оригинальном Dockerfile репозитория)
+RUN cargo build --workspace --release
 
-# Устанавливаем runtime зависимости
-RUN apt-get update && apt-get install -y \
-    libssl3 \
-    libopus0 \
-    libogg0 \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+# ═══════════════════════════════════════════════════════════════
+# ЭТАП 2: Runtime (лёгкий Alpine образ)
+# ═══════════════════════════════════════════════════════════════
+FROM alpine:3.19
 
-COPY --from=build /src/target/release/mumble-web-proxy /usr/local/bin/mumble-web-proxy
+# Runtime зависимости (только библиотеки, без dev-пакетов)
+RUN apk add --no-cache \
+    libnice \
+    glib \
+    openssl \
+    opus \
+    libogg \
+    ca-certificates
+
+# Копируем скомпилированный бинарник из builder
+COPY --from=builder /src/target/release/mumble-web-proxy /usr/local/bin/mumble-web-proxy
+
+# Делаем бинарник исполняемым
+RUN chmod +x /usr/local/bin/mumble-web-proxy
 
 # 1337 — WebSocket (через nginx/Traefik на mumble-web)
 # 64737 — UDP для WebRTC-медиа (пробрасывается напрямую)
 EXPOSE 1337/tcp 64737/udp
 
+# Запускаем mumble-web-proxy
 CMD ["mumble-web-proxy"]

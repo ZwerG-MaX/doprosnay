@@ -1,16 +1,18 @@
 # Альтернативный Dockerfile для mumble-web-proxy
-# Использует готовый бинарник из GitHub releases для быстрого развёртывания
+# Загружает готовый бинарник из GitHub releases для быстрого развёртывания
+# Runtime образ: Alpine (лёгкий, ~50-80 MB)
 
-FROM debian:bullseye-slim
+FROM alpine:3.19
 
-# Устанавливаем runtime зависимости
-RUN apt-get update && apt-get install -y \
+# Runtime зависимости (только библиотеки, без dev-пакетов)
+RUN apk add --no-cache \
     wget \
     ca-certificates \
-    libssl1.1 \
-    libopus0 \
-    libogg0 \
-    && rm -rf /var/lib/apt/lists/*
+    libnice \
+    glib \
+    openssl \
+    opus \
+    libogg
 
 WORKDIR /app
 
